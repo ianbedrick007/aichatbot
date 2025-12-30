@@ -4,68 +4,104 @@ from datetime import datetime
 from run_ai import get_ai_response
 from flask_sqlalchemy import SQLAlchemy
 from dotenv import load_dotenv
-
+from flask_migrate import Migrate
 load_dotenv()
 app = Flask(__name__)
 
-app.config['SQLALCHEMY_DATABASE_URI'] = (
-    os.getenv("CHATBOT_DB")
-)
-
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv("CHATBOT_DB")
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SECRET_KEY'] = os.getenv("SECRET_KEY", "your-secret-key-here")
 
 db = SQLAlchemy(app)
+migrate = Migrate(app, db)
 
 
-class Messages(db.Model):
-    __tablename__ = 'messages'
+# User model
+class User(db.Model):
+    __tablename__ = 'users'
+
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, unique=True, nullable=False)
-    user_message = db.Column(db.Text, nullable=False)
-    bot_response = db.Column(db.Text, nullable=False)
-    timestamp = db.Column(db.DateTime, default=datetime.now())
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    email = db.Column(db.String(120), unique=True, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+
+    # Relationship: one user has many messages
+    messages = db.relationship('Message', backref='user', lazy=True, cascade='all, delete-orphan')
+
+
+# Message model
+class Message(db.Model):
+    __tablename__ = 'messages'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    text = db.Column(db.Text, nullable=False)
+    sender = db.Column(db.String(10), nullable=False)  # 'user' or 'bot'
+    timestamp = db.Column(db.DateTime, default=datetime.now)
 
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
-    """Handle both displaying messages and processing new messages"""
+    user = User.query.filter_by(username='default_user').first()
+    if not user:
+        user = User(username='default_user')
+        db.session.add(user)
+        db.session.commit()
+
     if request.method == 'POST':
         user_message = request.form.get('message', '').strip()
 
         if user_message:
-            bot_response = get_ai_response(user_message)
+            # Get last 10 messages for context (adjust number as needed)
+            recent_messages = Message.query.filter_by(user_id=user.id) \
+                .order_by(Message.timestamp.desc()) \
+                .all()
 
-            # Fetch or create the user's message row
-            convo = Messages.query.filter_by(user_id=1).first()
+            conversation_history = [
+                {'text': msg.text, 'sender': msg.sender}
+                for msg in reversed(recent_messages)  # Reverse to get chronological order
+            ]
 
-            if convo:
-                convo.user_message += f"\n{user_message}"
-                convo.bot_response += f"\n{bot_response}"
-                convo.timestamp = datetime.now()
-            else:
-                convo = Messages(
-                    user_id=1,
-                    user_message=user_message,
-                    bot_response=bot_response
-                )
-                db.session.add(convo)
+            # Save user message
+            user_msg = Message(user_id=user.id, text=user_message, sender='user')
+            db.session.add(user_msg)
+            db.session.commit()
 
+            # Get AI response WITH context
+            bot_response = get_ai_response(user_message, conversation_history)
+
+            # Save bot response
+            bot_msg = Message(user_id=user.id, text=bot_response, sender='bot')
+            db.session.add(bot_msg)
             db.session.commit()
 
         return redirect(url_for('index'))
 
-    convo = Messages.query.filter_by(user_id=1).first()
-    display_messages = []
+    # Display all messages
+    messages = Message.query.filter_by(user_id=user.id) \
+        .order_by(Message.timestamp.asc()) \
+        .all()
 
-    if convo:
-        user_lines = convo.user_message.strip().split('\n')
-        bot_lines = convo.bot_response.strip().split('\n')
-
-        for user, bot in zip(user_lines, bot_lines):
-            display_messages.append({'text': user, 'sender': 'user'})
-            display_messages.append({'text': bot, 'sender': 'bot'})
+    display_messages = [
+        {
+            'text': msg.text,
+            'sender': msg.sender,
+            'timestamp': msg.timestamp.strftime('%I:%M %p')
+        }
+        for msg in messages
+    ]
 
     return render_template('index.html', messages=display_messages)
+
+
+@app.route('/clear', methods=['GET', 'POST'])
+def clear_messages():
+    """Clear all messages for current user"""
+    user = User.query.filter_by(username='default_user').first()
+    if user:
+        Message.query.filter_by(user_id=user.id).delete()
+        db.session.commit()
+    return redirect(url_for('index'))
 
 
 if __name__ == '__main__':
