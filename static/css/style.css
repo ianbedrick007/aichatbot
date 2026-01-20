@@ -18,7 +18,7 @@
     --md-divider: rgba(0, 0, 0, 0.12);
     --md-error: #B00020;
     --md-success: #4CAF50;
-    
+
     /* Material Design Spacing (8dp grid) */
     --md-spacing-xs: 4px;
     --md-spacing-sm: 8px;
@@ -26,7 +26,7 @@
     --md-spacing-lg: 24px;
     --md-spacing-xl: 32px;
     --md-spacing-xxl: 48px;
-    
+
     /* Material Design Elevation Shadows */
     --md-elevation-1: 0px 1px 3px rgba(0, 0, 0, 0.12), 0px 1px 2px rgba(0, 0, 0, 0.24);
     --md-elevation-2: 0px 3px 6px rgba(0, 0, 0, 0.16), 0px 3px 6px rgba(0, 0, 0, 0.23);
@@ -35,7 +35,7 @@
 }
 
 body {
-    font-family: 'Roboto', 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
     background-color: var(--md-background);
     color: var(--md-text-primary);
     height: 100vh;
@@ -46,6 +46,436 @@ body {
     font-size: 14px;
     line-height: 20px;
     letter-spacing: 0.25px;
+}
+
+/* Modern Glassmorphism Chat Interface */
+.chat-body {
+    position: relative;
+    min-height: 100vh;
+    background: url('../assets/shashank-hegde-ZugiKXUz-yc-unsplash.jpg') center center;
+    background-size: cover;
+    /* Simplified: Removed redundant background-size */
+    background-attachment: fixed;
+    overflow: hidden;
+}
+
+.chat-body::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: transparent;
+    z-index: -1;
+}
+
+.chat-wrapper {
+    position: relative;
+    width: 100%;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    z-index: 1;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+/* Glass Header */
+.chat-header-glass {
+    background: rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 72px;
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.avatar-circle {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.3), rgba(118, 75, 162, 0.3));
+    backdrop-filter: blur(10px);
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.avatar-initial {
+    color: #fff;
+    font-weight: 600;
+    font-size: 20px;
+    letter-spacing: 0;
+}
+
+.header-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.header-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: #fff;
+    margin: 0;
+    /* Simplified: Removed redundant margin */
+    letter-spacing: -0.3px;
+}
+
+.status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #4ade80;
+    box-shadow: 0 0 8px rgba(74, 222, 128, 0.5);
+    animation: pulse 2s ease infinite;
+}
+
+/* Simplified: Removed redundant @keyframes pulse */
+@keyframes pulse {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.6;
+    }
+}
+
+.status-text {
+    font-weight: 400;
+}
+
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.inline-form {
+    margin: 0;
+    /* Simplified: Removed redundant margin */
+    padding: 0;
+    display: inline;
+}
+
+.icon-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-decoration: none;
+}
+
+.icon-btn:hover {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.25);
+    transform: translateY(-1px);
+}
+
+.icon-btn:active {
+    transform: translateY(0);
+}
+
+/* Glass Messages Area */
+.chat-messages-glass {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    scroll-behavior: smooth;
+}
+
+.chat-messages-glass::-webkit-scrollbar {
+    width: 6px;
+}
+
+.chat-messages-glass::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.chat-messages-glass::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 3px;
+}
+
+.chat-messages-glass::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+/* Message Items */
+.message-item {
+    display: flex;
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.message-user {
+    justify-content: flex-end;
+}
+
+.message-bot {
+    justify-content: flex-start;
+}
+
+.message-bubble-glass {
+    max-width: 70%;
+    padding: 12px 16px;
+    border-radius: 16px;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    word-wrap: break-word;
+    position: relative;
+}
+
+.message-user .message-bubble-glass {
+    background: rgba(102, 126, 234, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-bottom-right-radius: 4px;
+}
+
+.message-bot .message-bubble-glass {
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-bottom-left-radius: 4px;
+}
+
+.message-text {
+    color: #fff;
+    font-size: 15px;
+    line-height: 1.5;
+    margin: 0 0 6px 0;
+    /* Simplified: Removed redundant margin */
+    font-weight: 400;
+    letter-spacing: -0.2px;
+}
+
+.message-time {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.8);
+    font-weight: 400;
+    display: block;
+    margin-top: 4px;
+}
+
+/* Empty State */
+.empty-state-glass {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.empty-text {
+    font-size: 15px;
+    font-weight: 400;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+/* Thinking Bubble */
+.thinking-bubble {
+    animation: slideIn 0.3s ease-out;
+}
+
+.thinking-bubble .message-bubble-glass {
+    min-width: 60px;
+}
+
+.thinking-dots {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 0;
+}
+
+.thinking-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.7);
+    animation: thinkingPulse 1.4s ease-in-out infinite;
+}
+
+.thinking-dot:nth-child(1) {
+    animation-delay: 0s;
+}
+
+.thinking-dot:nth-child(2) {
+    animation-delay: 0.2s;
+}
+
+.thinking-dot:nth-child(3) {
+    animation-delay: 0.4s;
+}
+
+@keyframes thinkingPulse {
+
+    0%,
+    60%,
+    100% {
+        transform: scale(1);
+        opacity: 0.7;
+    }
+
+    30% {
+        transform: scale(1.2);
+        opacity: 1;
+    }
+}
+
+/* Glass Input Area */
+.chat-input-glass {
+    padding: 20px 24px;
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.input-form {
+    margin: 0;
+    /* Simplified: Removed redundant margin */
+    padding: 0;
+}
+
+.input-container-glass {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 24px;
+    padding: 8px 8px 8px 20px;
+    transition: all 0.3s ease;
+}
+
+.input-container-glass:focus-within {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.25);
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.1);
+}
+
+.message-input-glass {
+    flex: 1;
+    border: none;
+    background: transparent;
+    color: #fff;
+    font-size: 15px;
+    font-family: 'Inter', sans-serif;
+    outline: none;
+    padding: 8px 0;
+    font-weight: 400;
+    letter-spacing: -0.2px;
+}
+
+.message-input-glass::placeholder {
+    color: rgba(255, 255, 255, 0.75);
+}
+
+.send-btn-glass {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: rgba(102, 126, 234, 0.3);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+.send-btn-glass:hover {
+    background: rgba(102, 126, 234, 0.4);
+    border-color: rgba(255, 255, 255, 0.3);
+    transform: scale(1.05);
+}
+
+.send-btn-glass:active {
+    transform: scale(0.95);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .chat-header-glass {
+        padding: 12px 16px;
+        min-height: 64px;
+    }
+
+    .header-title {
+        font-size: 16px;
+    }
+
+    .avatar-circle {
+        width: 40px;
+        height: 40px;
+    }
+
+    .avatar-initial {
+        font-size: 18px;
+    }
+
+    .chat-messages-glass {
+        padding: 16px;
+    }
+
+    .message-bubble-glass {
+        max-width: 85%;
+    }
+
+    .chat-input-glass {
+        padding: 16px;
+    }
 }
 
 /* Material Design Card Container */
@@ -130,6 +560,7 @@ body {
     font-weight: 500;
     color: white;
     margin: 0;
+    /* Simplified: Removed redundant margin */
     letter-spacing: 0.15px;
     line-height: 24px;
 }
@@ -138,6 +569,7 @@ body {
     font-size: 14px;
     color: rgba(255, 255, 255, 0.87);
     margin: var(--md-spacing-xs) 0 0 0;
+    /* Simplified: Removed redundant margin */
     font-weight: 400;
     letter-spacing: 0.25px;
     display: flex;
@@ -195,6 +627,7 @@ body {
         opacity: 0;
         transform: translateY(8px);
     }
+
     to {
         opacity: 1;
         transform: translateY(0);
@@ -261,6 +694,7 @@ body {
 
 .chat-input-container form {
     margin: 0;
+    /* Simplified: Removed redundant margin */
     padding: 0;
 }
 
@@ -380,30 +814,693 @@ body {
         margin: 0;
         box-shadow: none;
     }
-    
+
     body {
         background: var(--md-background);
     }
-    
+
     .message-bubble {
         max-width: 85%;
     }
-    
+
     .chat-header {
         padding: var(--md-spacing-md);
         min-height: 56px;
     }
-    
+
     .header-info h1 {
         font-size: 18px;
     }
-    
+
     .chat-messages {
         padding: var(--md-spacing-md);
     }
-    
+
     .chat-input-container {
         padding: var(--md-spacing-sm) var(--md-spacing-md);
     }
 }
 
+/* Glassmorphism Styles for Auth Pages */
+.auth-body {
+    position: relative;
+    min-height: 100vh;
+    background: url('../assets/shashank-hegde-ZugiKXUz-yc-unsplash.jpg') center center;
+    background-size: cover;
+    /* Simplified: Removed redundant background-size */
+    background-attachment: fixed;
+    overflow-y: auto;
+    display: block;
+    /* Override body flex */
+    height: auto;
+}
+
+.auth-body::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: transparent;
+    z-index: -1;
+}
+
+.glass-card {
+    position: relative;
+    width: 100%;
+    max-width: 450px;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    /* Simplified: Removed redundant border */
+    box-shadow: none;
+    z-index: 1;
+    transition: transform 0.3s ease;
+}
+
+.glass-card:hover {
+    transform: translateY(-5px);
+    box-shadow: none;
+}
+
+.glass-input {
+    background: rgba(255, 255, 255, 0.1) !important;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    border-radius: 10px !important;
+    color: #fff !important;
+    padding: 12px 15px !important;
+    transition: all 0.3s ease;
+}
+
+.glass-input::placeholder {
+    color: rgba(255, 255, 255, 0.6) !important;
+}
+
+.glass-input:focus {
+    background: rgba(255, 255, 255, 0.15) !important;
+    border-color: rgba(255, 255, 255, 0.4) !important;
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.1) !important;
+    outline: none !important;
+}
+
+.input-field {
+    position: relative;
+    margin-bottom: 1.5rem;
+}
+
+.glass-label {
+    position: absolute;
+    top: 12px;
+    left: 15px;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 16px;
+    pointer-events: none;
+    transition: all 0.3s ease;
+    background: transparent;
+    padding: 0 5px;
+}
+
+.glass-input:focus~.glass-label,
+.glass-input:not(:placeholder-shown)~.glass-label {
+    top: -10px;
+    left: 10px;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.9);
+    background: rgba(102, 126, 234, 0.3);
+    backdrop-filter: blur(10px);
+    border-radius: 5px;
+    padding: 2px 8px;
+}
+
+.glass-btn {
+    background: rgba(255, 255, 255, 0.2) !important;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.3) !important;
+    color: #fff !important;
+    font-weight: 600 !important;
+    padding: 12px 30px !important;
+    border-radius: 10px !important;
+    transition: all 0.3s ease !important;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.glass-btn:hover {
+    background: rgba(255, 255, 255, 0.3) !important;
+    border-color: rgba(255, 255, 255, 0.5) !important;
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+    color: #fff !important;
+}
+
+.glass-btn:active {
+    transform: translateY(0);
+}
+
+.glass-alert {
+    background: rgba(255, 255, 255, 0.15) !important;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    border-radius: 10px !important;
+    color: #fff !important;
+}
+
+.glass-alert.alert-danger {
+    background: rgba(220, 53, 69, 0.2) !important;
+    border-color: rgba(220, 53, 69, 0.4) !important;
+}
+
+.glass-alert.alert-success {
+    background: rgba(25, 135, 84, 0.2) !important;
+    border-color: rgba(25, 135, 84, 0.4) !important;
+}
+
+.glass-alert.alert-info {
+    background: rgba(13, 202, 240, 0.2) !important;
+    border-color: rgba(13, 202, 240, 0.4) !important;
+}
+
+.glass-alert .btn-close {
+    filter: brightness(0) invert(1);
+}
+
+/* Floating Thinking Animation */
+.floating-thinking {
+    position: absolute;
+    bottom: 90px;
+    left: 24px;
+    z-index: 1000;
+    background: transparent;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 8px 16px;
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 0.85rem;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+
+.thinking-dot-float {
+    width: 5px;
+    height: 5px;
+    background-color: currentColor;
+    border-radius: 50%;
+    animation: floatBounce 1.4s infinite ease-in-out both;
+}
+
+.thinking-dot-float:nth-child(1) {
+    animation-delay: -0.32s;
+}
+
+.thinking-dot-float:nth-child(2) {
+    animation-delay: -0.16s;
+}
+
+@keyframes floatBounce {
+
+    0%,
+    80%,
+    100% {
+        transform: scale(0);
+    }
+
+    40% {
+        transform: scale(1);
+    }
+}
+
+/* =========================================
+   Marketplace Styles
+   ========================================= */
+
+.marketplace-body {
+    position: relative;
+    min-height: 100vh;
+    background: url('../assets/shashank-hegde-ZugiKXUz-yc-unsplash.jpg') center center;
+    background-size: cover;
+    background-attachment: fixed;
+    font-family: 'Inter', sans-serif;
+    padding-top: 20px;
+    color: #fff;
+    display: block;
+    overflow-y: auto;
+}
+
+.marketplace-body::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: transparent;
+    z-index: -1;
+    pointer-events: none;
+}
+
+.navbar-glass {
+    background: rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 1rem 0;
+}
+
+.hero-glass {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 24px;
+    padding: 3rem 2rem;
+    margin-bottom: 3rem;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+.product-card {
+    background: rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.product-card:hover {
+    transform: translateY(-5px);
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.25);
+    box-shadow: 0 15px 30px rgba(0, 0, 0, 0.2);
+}
+
+.card-img-wrapper {
+    height: 240px;
+    overflow: hidden;
+    background: rgba(0, 0, 0, 0.2);
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.card-img-top {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.5s ease;
+}
+
+.product-card:hover .card-img-top {
+    transform: scale(1.05);
+}
+
+.price-badge {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    background: rgba(25, 118, 210, 0.9);
+    padding: 8px 16px;
+    border-radius: 30px;
+    font-weight: 700;
+    color: white;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    z-index: 2;
+    backdrop-filter: blur(4px);
+}
+
+.business-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background-color: rgba(255, 255, 255, 0.15);
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 6px;
+    margin-bottom: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.card-title {
+    color: #fff;
+}
+
+.card-text {
+    color: rgba(255, 255, 255, 0.7) !important;
+}
+
+.btn-view {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+.btn-view:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+    color: #fff;
+    transform: translateY(-1px);
+}
+
+/* Ensure content sits above overlay */
+.marketplace-body>* {
+    position: relative;
+    z-index: 1;
+}
+
+.nav-link {
+    color: rgba(255, 255, 255, 0.7) !important;
+}
+
+.nav-link:hover,
+.nav-link.active {
+    color: #fff !important;
+}
+
+.navbar-brand {
+    color: #fff !important;
+}
+
+/* Additional Product Styles from products.html */
+.product-card {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 16px;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.product-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+}
+
+.product-image {
+    height: 200px;
+    object-fit: cover;
+    border-radius: 16px 16px 0 0;
+}
+
+.product-placeholder {
+    height: 200px;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 16px 16px 0 0;
+}
+
+.search-container {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    padding: 1rem;
+    margin-bottom: 2rem;
+}
+
+.search-input {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    color: inherit;
+}
+
+.search-input:focus {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.4);
+    box-shadow: none;
+    color: inherit;
+}
+
+.search-input::placeholder {
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.btn-view {
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: inherit;
+    border-radius: 8px;
+    transition: all 0.2s;
+}
+
+.btn-view:hover {
+    background: rgba(255, 255, 255, 0.3);
+    color: inherit;
+}
+
+.products-grid {
+    padding: 1rem;
+}
+
+.price-tag {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #10b981;
+}
+
+.business-name {
+    font-size: 0.875rem;
+    opacity: 0.7;
+}
+
+.product-description {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    font-size: 0.875rem;
+    opacity: 0.8;
+}
+
+.modal-content-glass {
+    background: rgba(30, 30, 40, 0.95);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+}
+
+.modal-header-glass {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.modal-footer-glass {
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    opacity: 0.6;
+}
+
+/* =========================================
+   Missing Marketplace Glassmorphism Styles
+   ========================================= */
+
+.glass-header {
+    background: rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 0.75rem 0;
+    z-index: 1020;
+}
+
+.marketplace-container {
+    padding-top: 2rem;
+    padding-bottom: 4rem;
+}
+
+.sidebar-glass {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 24px;
+    padding: 1.75rem;
+    height: fit-content;
+    position: sticky;
+    top: 2rem;
+}
+
+.glass-panel {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+.table-glass {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.table-glass th {
+    background: rgba(255, 255, 255, 0.03);
+    padding: 1.25rem 1.5rem;
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.table-glass td {
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    vertical-align: middle;
+}
+
+.table-glass tr:last-child td {
+    border-bottom: none;
+}
+
+.table-glass tr:hover td {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.btn-glass {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #fff;
+    padding: 0.6rem 1.25rem;
+    border-radius: 12px;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.btn-glass:hover {
+    background: rgba(255, 255, 255, 0.2);
+    border-color: rgba(255, 255, 255, 0.4);
+    color: #fff;
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+.btn-icon-circle {
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    justify-content: center;
+    border-radius: 50%;
+}
+
+.input-group-glass {
+    background: rgba(255, 255, 255, 0.07);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 14px;
+    transition: all 0.3s ease;
+}
+
+.input-group-glass:focus-within {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.3);
+    box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.05);
+}
+
+.form-control-glass {
+    background: transparent !important;
+    border: none !important;
+    color: #fff !important;
+    padding: 0.75rem 1rem;
+}
+
+.form-control-glass::placeholder {
+    color: rgba(255, 255, 255, 0.4);
+}
+
+.form-control-glass:focus {
+    box-shadow: none !important;
+}
+
+.filter-group {
+    margin-bottom: 2.25rem;
+}
+
+.filter-group:last-child {
+    margin-bottom: 0;
+}
+
+.filter-title {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.3);
+    letter-spacing: 0.15em;
+    margin-bottom: 1.25rem;
+}
+
+.text-secondary-custom {
+    color: rgba(255, 255, 255, 0.5) !important;
+}
+
+.object-fit-cover {
+    object-fit: cover;
+}
+
+/* Modal Glass Styling */
+.modal-content.glass-panel {
+    border-radius: 24px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.modal-backdrop {
+    backdrop-filter: blur(8px);
+    background-color: rgba(0, 0, 0, 0.4);
+}
+
+/* Custom Backdrop Filter for Modals if supported */
+@supports (backdrop-filter: blur(20px)) {
+    .modal-content.glass-panel {
+        background: rgba(25, 25, 35, 0.7);
+    }
+}
+
+/* Form Check Custom Styling */
+.form-check-input {
+    background-color: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.2);
+    cursor: pointer;
+}
+
+.form-check-input:checked {
+    background-color: var(--md-primary);
+    border-color: var(--md-primary);
+}
+
+.form-check-input:focus {
+    box-shadow: 0 0 0 0.25rem rgba(25, 118, 210, 0.25);
+}

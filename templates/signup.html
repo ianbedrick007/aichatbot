@@ -3,195 +3,83 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sign Up - Material Design</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <title>Sign Up - AI Chatbot</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" 
+          integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <style>
-        .auth-container {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            background-color: var(--md-background);
-            padding: var(--md-spacing-md);
-        }
-        
-        .auth-card {
-            background: var(--md-surface);
-            border-radius: 4px;
-            box-shadow: var(--md-elevation-4);
-            padding: var(--md-spacing-xxl);
-            width: 100%;
-            max-width: 400px;
-        }
-        
-        .auth-card h1 {
-            font-size: 24px;
-            font-weight: 500;
-            color: var(--md-text-primary);
-            margin-bottom: var(--md-spacing-md);
-            letter-spacing: 0.15px;
-        }
-        
-        .auth-card p {
-            color: var(--md-text-secondary);
-            margin-bottom: var(--md-spacing-xl);
-            font-size: 14px;
-        }
-        
-        .form-group {
-            margin-bottom: var(--md-spacing-lg);
-        }
-        
-        .form-group label {
-            display: block;
-            font-size: 12px;
-            font-weight: 500;
-            color: var(--md-text-primary);
-            margin-bottom: var(--md-spacing-xs);
-            letter-spacing: 0.4px;
-            text-transform: uppercase;
-        }
-        
-        .form-group input {
-            width: 100%;
-            padding: var(--md-spacing-sm) var(--md-spacing-md);
-            border: 1px solid var(--md-divider);
-            border-radius: 4px;
-            font-size: 16px;
-            font-family: 'Roboto', sans-serif;
-            background: var(--md-surface);
-            color: var(--md-text-primary);
-            transition: border-color 0.2s, box-shadow 0.2s;
-            box-sizing: border-box;
-        }
-        
-        .form-group input:focus {
-            outline: none;
-            border-color: var(--md-primary);
-            box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.2);
-        }
-        
-        .btn-primary {
-            width: 100%;
-            padding: var(--md-spacing-md);
-            background: var(--md-primary);
-            color: white;
-            border: none;
-            border-radius: 4px;
-            font-size: 14px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: background 0.2s, box-shadow 0.2s;
-            text-transform: uppercase;
-            letter-spacing: 1.25px;
-            box-shadow: var(--md-elevation-2);
-        }
-        
-        .btn-primary:hover {
-            background: var(--md-primary-dark);
-            box-shadow: var(--md-elevation-4);
-        }
-        
-        .btn-primary:active {
-            box-shadow: var(--md-elevation-1);
-        }
-        
-        .auth-links {
-            text-align: center;
-            margin-top: var(--md-spacing-lg);
-            padding-top: var(--md-spacing-lg);
-            border-top: 1px solid var(--md-divider);
-        }
-        
-        .auth-links a {
-            color: var(--md-primary);
-            text-decoration: none;
-            font-size: 14px;
-            font-weight: 500;
-        }
-        
-        .auth-links a:hover {
-            text-decoration: underline;
-        }
-        
-        .flash-messages {
-            margin-bottom: var(--md-spacing-lg);
-        }
-        
-        .flash-message {
-            padding: var(--md-spacing-sm) var(--md-spacing-md);
-            border-radius: 4px;
-            margin-bottom: var(--md-spacing-sm);
-            font-size: 14px;
-        }
-        
-        .flash-message.error {
-            background: #ffebee;
-            color: var(--md-error);
-            border-left: 4px solid var(--md-error);
-        }
-        
-        .flash-message.success {
-            background: #e8f5e9;
-            color: var(--md-success);
-            border-left: 4px solid var(--md-success);
-        }
-        
-        .flash-message.info {
-            background: #e3f2fd;
-            color: var(--md-primary);
-            border-left: 4px solid var(--md-primary);
-        }
-    </style>
 </head>
-<body>
-    <div class="auth-container">
-        <div class="auth-card">
-            <h1>Sign Up</h1>
-            <p>Create a new account to get started</p>
-            
-            {% with messages = get_flashed_messages(with_categories=true) %}
-                {% if messages %}
-                    <div class="flash-messages">
-                        {% for category, message in messages %}
-                            <div class="flash-message {{ category }}">{{ message }}</div>
-                        {% endfor %}
+<body class="auth-body">
+    <div class="container d-flex justify-content-center align-items-center min-vh-100">
+        <div class="glass-card">
+            <div class="card-body p-5">
+                <h1 class="card-title text-center mb-4 text-white">Sign Up</h1>
+                <p class="text-white-50 text-center mb-4">Create a new account to get started</p>
+
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        <div class="mb-4">
+                            {% for category, message in messages %}
+                                <div class="alert alert-{{ 'danger' if category == 'error' else 'success' if category == 'success' else 'info' }} alert-dismissible fade show glass-alert" role="alert">
+                                    {{ message }}
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                {% endwith %}
+
+                <form method="POST" action="{{ url_for('signup') }}">
+                    <div class="mb-4">
+                        <div class="input-field">
+                            <input type="text" class="form-control glass-input" id="username" name="username" required autofocus>
+                            <label for="username" class="glass-label">Username</label>
+                        </div>
                     </div>
-                {% endif %}
-            {% endwith %}
-            
-            <form method="POST" action="{{ url_for('signup') }}">
-                <div class="form-group">
-                    <label for="username">Username</label>
-                    <input type="text" id="username" name="username" required autofocus>
+
+                    <div class="mb-4">
+                        <div class="input-field">
+                            <input type="email" class="form-control glass-input" id="email" name="email">
+                            <label for="email" class="glass-label">Email (Optional)</label>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <div class="input-field">
+                            <input type="password" class="form-control glass-input" id="password" name="password" required minlength="6">
+                            <label for="password" class="glass-label">Password</label>
+                        </div>
+                    </div>
+                    <div class="mb-4">
+                        <div class="input-field">
+                            <input type="password" class="form-control glass-input" id="confirm_password" name="confirm_password" required minlength="6">
+                            <label for="confirm_password" class="glass-label">Confirm Password</label>
+                        </div>
+                    </div>
+                    <div class="mb-4">
+                        <div class="input-field">
+                            <input type="text"
+                                       class="form-control glass-input"
+                                       id="business_name"
+                                       name="business_name"
+                                       required>
+                            <label for="business_name" class="glass-label">Business Name</label>
+                        </div>
+                    </div>
+
+
+                    <button type="submit" class="btn glass-btn w-100 mb-3">Create Account</button>
+                </form>
+
+                <div class="text-center pt-3 border-top border-white border-opacity-25">
+                    <p class="mb-0 text-white-50">Already have an account? <a href="{{ url_for('login') }}" class="text-white text-decoration-none fw-bold">Sign in</a></p>
                 </div>
-                
-                <div class="form-group">
-                    <label for="email">Email (Optional)</label>
-                    <input type="email" id="email" name="email">
-                </div>
-                
-                <div class="form-group">
-                    <label for="password">Password</label>
-                    <input type="password" id="password" name="password" required minlength="6">
-                </div>
-                
-                <div class="form-group">
-                    <label for="confirm_password">Confirm Password</label>
-                    <input type="password" id="confirm_password" name="confirm_password" required minlength="6">
-                </div>
-                
-                <button type="submit" class="btn-primary">Create Account</button>
-            </form>
-            
-            <div class="auth-links">
-                <p>Already have an account? <a href="{{ url_for('login') }}">Sign in</a></p>
             </div>
         </div>
     </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" 
+            integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
 </body>
 </html>
-

@@ -1,12 +1,11 @@
 import os
 from flask import Flask, render_template, request, redirect, url_for, flash
-from datetime import datetime
-from run_ai import get_ai_response
-from flask_sqlalchemy import SQLAlchemy
+from ai.run_ai import get_ai_response
 from dotenv import load_dotenv
 from flask_migrate import Migrate
-from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
-from werkzeug.security import generate_password_hash, check_password_hash
+from flask_login import LoginManager, login_user, login_required, logout_user, current_user
+from werkzeug.security import generate_password_hash
+from ai.models import db, User, Message, Product, Business
 
 load_dotenv()
 app = Flask(__name__)
@@ -15,46 +14,13 @@ app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv("CHATBOT_DB")
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = os.getenv("SECRET_KEY", "your-secret-key-here")
 
-db = SQLAlchemy(app)
+db.init_app(app)
 migrate = Migrate(app, db)
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 login_manager.login_message = 'Please log in to access the chat.'
 login_manager.login_message_category = 'info'
-
-
-# User model
-class User(UserMixin, db.Model):
-    __tablename__ = 'users'
-
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(80), unique=True, nullable=False)
-    email = db.Column(db.String(120), unique=True, nullable=True)
-    password_hash = db.Column(db.String(255), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.now)
-
-    # Relationship: one user has many messages
-    messages = db.relationship('Message', backref='user', lazy=True, cascade='all, delete-orphan')
-
-    def set_password(self, password):
-        """Hash and set the user's password"""
-        self.password_hash = generate_password_hash(password)
-
-    def check_password(self, password):
-        """Check if the provided password matches the hash"""
-        return check_password_hash(self.password_hash, password)
-
-
-# Message model
-class Message(db.Model):
-    __tablename__ = 'messages'
-
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    text = db.Column(db.Text, nullable=True)
-    sender = db.Column(db.String(10), nullable=False)  # 'user' or 'bot'
-    timestamp = db.Column(db.DateTime, default=datetime.now)
 
 
 @login_manager.user_loader
@@ -74,27 +40,69 @@ def login():
         password = request.form.get('password', '')
         user = User.query.filter_by(username=username).first()
 
-        if not user:
+        # ✅ Fix: "user not found" should not say "fill in all fields"
+        if not username or not password:
             flash('Please fill in all fields.', 'error')
-        elif not check_password_hash(user.password_hash, password):
-            flash('Password not correct')
             return redirect(url_for('login'))
-        else:
-            login_user(user)
-            flash(f'Welcome back, {username}!', 'success')
-            return redirect(url_for('index'))
+
+        if not user or not user.check_password(password):
+            flash('Invalid username or password.', 'error')
+            return redirect(url_for('login'))
+
+        login_user(user)
+        flash(f'Welcome back, {username}!', 'success')
+        return redirect(url_for('index'))
+
     return render_template('login.html')
 
 
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
+    """
+    ✅ Signup now creates BOTH:
+      - User (login)
+      - Business (the account container)
+    """
     if request.method == 'POST':
-        new_user = User(username=request.form.get('username'), email=request.form.get('email'),
-                        password_hash=generate_password_hash(request.form.get('password'), method='pbkdf2:sha256',
-                                                             salt_length=8))
+        username = (request.form.get('username') or '').strip()
+        email = (request.form.get('email') or '').strip() or None
+        password = request.form.get('password') or ''
+        business_name = (request.form.get('business_name') or '').strip()
+
+        # Basic validation
+        if not username or not password or not business_name:
+            flash('Username, password, and business name are required.', 'error')
+            return redirect(url_for('signup'))
+
+        # Prevent duplicates
+        if User.query.filter_by(username=username).first():
+            flash('Username already exists.', 'error')
+            return redirect(url_for('signup'))
+
+        if email and User.query.filter_by(email=email).first():
+            flash('Email already exists.', 'error')
+            return redirect(url_for('signup'))
+
+        # Create new user
+        new_user = User(
+            username=username,
+            email=email,
+            password_hash=generate_password_hash(password, method='pbkdf2:sha256', salt_length=8)
+        )
         db.session.add(new_user)
+        db.session.flush()  # ensures new_user.id exists before Business insert
+
+        # Create the user's business (1:1)
+        new_business = Business(name=business_name, user_id=new_user.id)
+        db.session.add(new_business)
+
         db.session.commit()
-        return render_template('index.html', user=new_user)
+
+        # Optional: auto-login after signup
+        login_user(new_user)
+        flash('Account created successfully!', 'success')
+        return redirect(url_for('index'))
+
     return render_template("signup.html")
 
 
@@ -110,39 +118,47 @@ def logout():
 @app.route('/', methods=['GET', 'POST'])
 @login_required
 def index():
-    """Chat page - requires authentication"""
+    """
+    ✅ Chat page - requires authentication
+    Messages are now tied to the logged-in user's business.
+    """
+    business = current_user.business
+    if not business:
+        flash('No business found for this account. Please sign up again or contact support.', 'error')
+        return redirect(url_for('logout'))
+
     if request.method == 'POST':
         user_message = request.form.get('message', '').strip()
 
         if user_message:
-            # Get last 10 messages for context (adjust number as needed)
-            recent_messages = Message.query.filter_by(user_id=current_user.id) \
+            # ✅ Get recent messages for THIS BUSINESS for context
+            recent_messages = Message.query.filter_by(business_id=business.id) \
                 .order_by(Message.timestamp.desc()) \
-                .limit(20)\
+                .limit(20) \
                 .all()
 
             conversation_history = [
                 {'text': msg.text, 'sender': msg.sender}
-                for msg in reversed(recent_messages)  # Reverse to get chronological order
+                for msg in reversed(recent_messages)
             ]
 
-            # Save user message
-            user_msg = Message(user_id=current_user.id, text=user_message, sender='user')
+            # ✅ Save user message (business-scoped)
+            user_msg = Message(business_id=business.id, text=user_message, sender='user')
             db.session.add(user_msg)
             db.session.commit()
 
-            # Get AI response WITH context
+            # ✅ Get AI response WITH context
             bot_response = get_ai_response(user_message, conversation_history)
 
-            # Save bot response
-            bot_msg = Message(user_id=current_user.id, text=bot_response, sender='bot')
+            # ✅ Save bot response (business-scoped)
+            bot_msg = Message(business_id=business.id, text=bot_response, sender='bot')
             db.session.add(bot_msg)
             db.session.commit()
 
         return redirect(url_for('index'))
 
-    # Display all messages
-    messages = Message.query.filter_by(user_id=current_user.id) \
+    # ✅ Display all messages for THIS BUSINESS
+    messages = Message.query.filter_by(business_id=business.id) \
         .order_by(Message.timestamp.asc()) \
         .all()
 
@@ -161,14 +177,73 @@ def index():
 @app.route('/clear', methods=['GET', 'POST'])
 @login_required
 def clear_messages():
-    """Clear all messages for current user"""
-    Message.query.filter_by(user_id=current_user.id).delete()
+    """✅ Clear all messages for current business"""
+    business = current_user.business
+    if not business:
+        flash('No business found.', 'error')
+        return redirect(url_for('index'))
+
+    Message.query.filter_by(business_id=business.id).delete()
     db.session.commit()
     flash('Messages cleared.', 'info')
     return redirect(url_for('index'))
 
 
+@app.route('/add_product', methods=['POST'])
+@login_required
+def add_product():
+    """
+    ✅ Add product for the logged-in user's business.
+    IMPORTANT: we do NOT accept business_id from the form anymore (prevents abuse).
+    """
+    business = current_user.business
+    if not business:
+        flash('No business found.', 'error')
+        return redirect(url_for('index'))
+
+    name = (request.form.get('name') or '').strip()
+    description = (request.form.get('description') or '').strip()
+    price_raw = (request.form.get('price') or '').strip()
+    image_url = (request.form.get('image_url') or '').strip()
+
+    if not name or not price_raw:
+        flash('Name and price are required.', 'error')
+        return redirect(url_for('index'))
+
+    try:
+        price = float(price_raw)
+    except ValueError:
+        flash('Price must be a valid number.', 'error')
+        return redirect(url_for('index'))
+
+    product = Product(
+        name=name,
+        description=description if description else None,
+        price=price,
+        image_url=image_url if image_url else None,
+        business_id=business.id
+    )
+    db.session.add(product)
+    db.session.commit()
+    flash('Product added successfully!', 'success')
+    return redirect(url_for('products'))
+
+
+@app.route('/products')
+@login_required
+def products():
+    """✅ Display products for current business only"""
+    business = current_user.business
+    if not business:
+        flash('No business found.', 'error')
+        return redirect(url_for('index'))
+
+    products = Product.query.filter_by(business_id=business.id).all()
+    return render_template('products.html', products=products)
+
+
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
+
     app.run(debug=True, port=5000)
