@@ -184,3 +184,5 @@ def get_rate( pair, side, amount_crypto, amount_fiat):
         return quote
     except Exception as e:
         return {"error": str(e)}
+
+

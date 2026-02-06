@@ -6,13 +6,20 @@ from flask_migrate import Migrate
 from flask_login import LoginManager, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash
 from ai.models import db, User, Message, Product, Business
+from whatsapp_bot.app.views import webhook_blueprint
+from whatsapp_bot.app.config import load_configurations, configure_logging
 
 load_dotenv()
 app = Flask(__name__)
 
+# Configure WhatsApp Bot
+load_configurations(app)
+configure_logging()
+app.register_blueprint(webhook_blueprint)
+
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv("CHATBOT_DB")
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SECRET_KEY'] = os.getenv("SECRET_KEY", "your-secret-key-here")
+app.config['SECRET_KEY'] = os.getenv("SECRET_KEY")
 
 db.init_app(app)
 migrate = Migrate(app, db)
@@ -246,4 +253,4 @@ if __name__ == '__main__':
     with app.app_context():
         db.create_all()
 
-    app.run(host='0.0.0.0',debug=True, port=5000)
+    app.run(host='0.0.0.0', debug=True, port=8000)
