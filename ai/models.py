@@ -71,4 +71,8 @@ class Business(db.Model):
     # unique=True enforces "one user -> one business"
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, unique=True)
 
+    # ✅ NEW: WhatsApp phone number ID mapping
+    # Changed to BigInteger to support large phone number IDs
+    phone_number_id = db.Column(db.BigInteger, unique=True, nullable=True)
+
     created_at = db.Column(db.DateTime, default=datetime.now)

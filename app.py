@@ -75,6 +75,8 @@ def signup():
         email = (request.form.get('email') or '').strip() or None
         password = request.form.get('password') or ''
         business_name = (request.form.get('business_name') or '').strip()
+        # ✅ Optional: collect phone_number_id during signup
+        phone_number_id = (request.form.get('phone_number_id') or '').strip() or None
 
         # Basic validation
         if not username or not password or not business_name:
@@ -90,6 +92,10 @@ def signup():
             flash('Email already exists.', 'error')
             return redirect(url_for('signup'))
 
+        if phone_number_id and Business.query.filter_by(phone_number_id=phone_number_id).first():
+            flash('This WhatsApp phone number is already registered.', 'error')
+            return redirect(url_for('signup'))
+
         # Create new user
         new_user = User(
             username=username,
@@ -100,7 +106,11 @@ def signup():
         db.session.flush()  # ensures new_user.id exists before Business insert
 
         # Create the user's business (1:1)
-        new_business = Business(name=business_name, user_id=new_user.id)
+        new_business = Business(
+            name=business_name,
+            user_id=new_user.id,
+            phone_number_id=phone_number_id
+        )
         db.session.add(new_business)
 
         db.session.commit()
@@ -154,8 +164,12 @@ def index():
             db.session.add(user_msg)
             db.session.commit()
 
-            # ✅ Get AI response WITH context
-            bot_response = get_ai_response(user_message, conversation_history)
+            # ✅ Get AI response WITH context AND business_id
+            bot_response = get_ai_response(
+                user_message,
+                conversation_history,
+                business_id=business.id
+            )
 
             # ✅ Save bot response (business-scoped)
             bot_msg = Message(business_id=business.id, text=bot_response, sender='bot')
@@ -247,6 +261,37 @@ def products():
 
     products = Product.query.filter_by(business_id=business.id).all()
     return render_template('products.html', products=products)
+
+
+@app.route('/settings', methods=['GET', 'POST'])
+@login_required
+def settings():
+    """✅ Settings page to configure WhatsApp phone number"""
+    business = current_user.business
+    if not business:
+        flash('No business found.', 'error')
+        return redirect(url_for('index'))
+
+    if request.method == 'POST':
+        phone_number_id = (request.form.get('phone_number_id') or '').strip() or None
+
+        # Check if phone number is already taken by another business
+        if phone_number_id:
+            existing = Business.query.filter(
+                Business.phone_number_id == phone_number_id,
+                Business.id != business.id
+            ).first()
+
+            if existing:
+                flash('This WhatsApp phone number is already registered to another business.', 'error')
+                return redirect(url_for('settings'))
+
+        business.phone_number_id = phone_number_id
+        db.session.commit()
+        flash('Settings updated successfully!', 'success')
+        return redirect(url_for('settings'))
+
+    return render_template('settings.html', business=business)
 
 
 if __name__ == '__main__':

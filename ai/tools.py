@@ -134,18 +134,26 @@ def get_exchange_rate(local_currency, foreign_currency):
         return {"error": str(e)}
 
 
-def get_products():
-    """Get the list of products for the current user's business."""
-    try:
-        if not current_user.is_authenticated:
-            return {"error": "User not authenticated"}
-        
-        business = current_user.business
-        if not business:
-            return {"error": "No business found for current user"}
+def get_products(business_id=None):
+    """
+    Get the list of products for a business.
 
-        products = Product.query.filter_by(business_id=business.id).all()
-        
+    Args:
+        business_id: Optional business ID. If not provided, tries to use current_user's business.
+    """
+    try:
+        # If business_id is provided (e.g., from WhatsApp), use it directly
+        if business_id:
+            products = Product.query.filter_by(business_id=business_id).all()
+        # Otherwise, try to use the current logged-in user's business
+        elif current_user.is_authenticated:
+            business = current_user.business
+            if not business:
+                return {"error": "No business found for current user"}
+            products = Product.query.filter_by(business_id=business.id).all()
+        else:
+            return {"error": "No business context available"}
+
         product_list = []
         for p in products:
             product_list.append({
@@ -155,13 +163,13 @@ def get_products():
                 "price": p.price,
                 "image_url": p.image_url
             })
-            
+
         return product_list
     except Exception as e:
         return {"error": str(e)}
 
 
-def get_rate( pair, side, amount_crypto, amount_fiat):
+def get_rate(pair, side, amount_crypto, amount_fiat):
     quotes_url = f"{VAULTA_BASE_URL}/get_quote"
     headers = {
         "x-api-key": VAULTA_API_KEY,
@@ -174,7 +182,7 @@ def get_rate( pair, side, amount_crypto, amount_fiat):
         "amount_crypto": amount_crypto,
         "amount_fiat": amount_fiat
     }
-    
+
     try:
         response = requests.post(quotes_url, headers=headers, json=payload)
         response.raise_for_status()
@@ -184,5 +192,3 @@ def get_rate( pair, side, amount_crypto, amount_fiat):
         return quote
     except Exception as e:
         return {"error": str(e)}
-
-
