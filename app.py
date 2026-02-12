@@ -274,6 +274,7 @@ def settings():
 
     if request.method == 'POST':
         phone_number_id = (request.form.get('phone_number_id') or '').strip() or None
+        persona = (request.form.get('persona') or '').strip() or None
 
         # Check if phone number is already taken by another business
         if phone_number_id:
@@ -287,6 +288,7 @@ def settings():
                 return redirect(url_for('settings'))
 
         business.phone_number_id = phone_number_id
+        business.persona = persona
         db.session.commit()
         flash('Settings updated successfully!', 'success')
         return redirect(url_for('settings'))

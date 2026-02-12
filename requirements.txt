@@ -12,3 +12,7 @@ SQLAlchemy~=2.0.45
 Werkzeug~=3.0.1
 pydantic~=2.12.5
 gunicorn~=23.0.0
+
+fastapi~=0.128.7
+uvicorn
+aiohttp~=3.12.13

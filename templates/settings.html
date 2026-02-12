@@ -200,6 +200,30 @@
                 {% endif %}
             </div>
 
+            <div class="form-group">
+                <label for="persona">Business Persona</label>
+                <input
+                    type="text"
+                    id="persona"
+                    name="persona"
+                    value="{{ business.persona or '' }}"
+                    placeholder="AI Persona"
+                >
+                <p class="help-text">
+                    Enter your business persona here. This gives the AI a personalized way to respond to messages.
+                </p>
+
+                {% if business.persona %}
+                    <div class="current-value">
+                        Currently configured: {{ business.persona }}
+                    </div>
+                {% else %}
+                    <div class="current-value empty">
+                        Not configured yet
+                    </div>
+                {% endif %}
+            </div>
+
             <button type="submit">Save Settings</button>
         </form>
     </div>

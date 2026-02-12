@@ -1,7 +1,11 @@
 import requests
+from dotenv import load_dotenv
 from flask_login import current_user
 from ai.models import Product
 import os
+from payment.payment import initialize_payment, verify_payment
+
+load_dotenv()
 
 BASE_URL = os.getenv("VAULTA_BASE_URL")
 VAULTA_BASE_URL = BASE_URL
@@ -97,7 +101,50 @@ tools = [
                 "additionalProperties": False,
             }
         }
+    },
+    {
+        "name": "initialize_payment",
+        "description": "Initialize a Paystack payment transaction. Amount should be provided in major currency units (e.g., GHS). Returns authorization URL and transaction reference.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "customer_email": {
+                    "type": "string",
+                    "description": "Customer email address"
+                },
+                "amount": {
+                    "type": "number",
+                    "description": "Amount in major units (e.g., 10.50 for GHS 10.50)"
+                },
+                "callback_url": {
+                    "type": "string",
+                    "description": "Optional callback URL for Paystack redirect",
+                    "nullable": True
+                },
+                "currency": {
+                    "type": "string",
+                    "description": "Currency code (default: GHS)",
+                    "default": "GHS"
+                }
+            },
+            "required": ["customer_email", "amount"]
+        }
+    },
+    {
+        "name": "verify_payment",
+        "description": "Verify a Paystack transaction using its reference. Returns transaction status, metadata, and payment details.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "reference": {
+                    "type": "string",
+                    "description": "The Paystack transaction reference to verify"
+                }
+            },
+            "required": ["reference"]
+        }
     }
+
 ]
 
 

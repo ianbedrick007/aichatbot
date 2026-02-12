@@ -1,0 +1,2162 @@
+Index: ai/tools.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/ai/tools.py b/ai/tools.py
+--- a/ai/tools.py
++++ b/ai/tools.py	(date 1770858469288)
+@@ -1,6 +1,5 @@
+ import requests
+ from dotenv import load_dotenv
+-from flask_login import current_user
+ from ai.models import Product
+ import os
+ from payment.payment import initialize_payment, verify_payment
+@@ -191,27 +190,29 @@
+     try:
+         # If business_id is provided (e.g., from WhatsApp), use it directly
+         if business_id:
+-            products = Product.query.filter_by(business_id=business_id).all()
+-        # Otherwise, try to use the current logged-in user's business
+-        elif current_user.is_authenticated:
+-            business = current_user.business
+-            if not business:
+-                return {"error": "No business found for current user"}
+-            products = Product.query.filter_by(business_id=business.id).all()
+-        else:
+-            return {"error": "No business context available"}
+-
+-        product_list = []
+-        for p in products:
+-            product_list.append({
+-                "id": p.id,
+-                "name": p.name,
+-                "description": p.description,
+-                "price": p.price,
+-                "image_url": p.image_url
+-            })
+-
+-        return product_list
++            # Note: In FastAPI/SQLAlchemy 2.0, we usually need a session to query.
++            # For simplicity in this tool function, we assume the caller handles DB or we'd need to inject a session.
++            # However, since this is called by AI, we might need a fresh session here if not passed.
++            # For now, let's assume we can't query without a session. 
++            # To fix this properly, we should pass the DB session to tools or use a scoped session.
++            
++            # TEMPORARY FIX: We need a database session here.
++            from ai.models import session
++            with session() as db:
++                products = db.query(Product).filter(Product.business_id == business_id).all()
++                
++                product_list = []
++                for p in products:
++                    product_list.append({
++                        "id": p.id,
++                        "name": p.name,
++                        "description": p.description,
++                        "price": p.price,
++                        "image_url": p.image_url
++                    })
++                return product_list
++        else:
++            return {"error": "No business context available"}
+     except Exception as e:
+         return {"error": str(e)}
+ 
+Index: ai/models.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/ai/models.py b/ai/models.py
+--- a/ai/models.py
++++ b/ai/models.py	(date 1770856251278)
+@@ -1,23 +1,32 @@
+-from flask_sqlalchemy import SQLAlchemy
+-from flask_login import UserMixin
++import os
++
++from dotenv import load_dotenv
++from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, BigInteger, Float, create_engine
++from sqlalchemy.orm import relationship, declarative_base, sessionmaker
+ from datetime import datetime
+ from werkzeug.security import generate_password_hash, check_password_hash
++from ai.base_models import UserSchema, MessageSchema, ProductSchema, BusinessSchema
++
+ 
+-db = SQLAlchemy()
++load_dotenv()
++DATABASE_URL = os.getenv("CHATBOT_DB")
++engine = create_engine(DATABASE_URL,echo=True)
++session = sessionmaker(bind=engine,autocommit=False,autoflush=False)
++Base = declarative_base()
++
+ 
+ # User model
+-class User(UserMixin, db.Model):
++class User(Base):
+     __tablename__ = 'users'
+ 
+-    id = db.Column(db.Integer, primary_key=True)
+-    username = db.Column(db.String(80), unique=True, nullable=False)
+-    email = db.Column(db.String(120), unique=True, nullable=True)
+-    password_hash = db.Column(db.String(255), nullable=False)
+-    created_at = db.Column(db.DateTime, default=datetime.now)
++    id = Column(Integer, primary_key=True)
++    username = Column(String(80), unique=True, nullable=False)
++    email = Column(String(120), unique=True, nullable=True)
++    password_hash = Column(String(255), nullable=False)
++    created_at = Column(DateTime, default=datetime.now)
+ 
+     # ✅ 1:1 relationship: one user has one business (business is the "account")
+-    business = db.relationship('Business', backref='user', uselist=False, lazy=True,
+-                               cascade='all, delete-orphan')
++    business = relationship('Business', back_populates='user', uselist=False, cascade='all, delete-orphan')
+ 
+     def set_password(self, password):
+         """Hash and set the user's password"""
+@@ -29,53 +38,58 @@
+ 
+ 
+ # Message model
+-class Message(db.Model):
++class Message(Base):
+     __tablename__ = 'messages'
+ 
+-    id = db.Column(db.Integer, primary_key=True)
++    id = Column(Integer, primary_key=True)
+ 
+     # ✅ Messages belong to the business (not directly to the user)
+-    business_id = db.Column(db.Integer, db.ForeignKey('businesses.id'), nullable=False)
++    business_id = Column(Integer, ForeignKey('businesses.id'), nullable=False)
+ 
+-    text = db.Column(db.Text, nullable=True)
+-    sender = db.Column(db.String(10), nullable=False)  # 'user' or 'bot'
+-    timestamp = db.Column(db.DateTime, default=datetime.now)
++    text = Column(Text, nullable=True)
++    sender = Column(String(50), nullable=False)  # 'user' or 'bot' or phone number
++    timestamp = Column(DateTime, default=datetime.now)
+ 
+     # Relationship back to business
+-    business = db.relationship('Business', backref='messages', lazy=True)
++    business = relationship('Business', back_populates='messages')
+ 
+ 
+-class Product(db.Model):
++class Product(Base):
+     __tablename__ = 'products'
+ 
+-    id = db.Column(db.Integer, primary_key=True)
++    id = Column(Integer, primary_key=True)
+ 
+     # ✅ Products belong to the business
+-    business_id = db.Column(db.Integer, db.ForeignKey('businesses.id'), nullable=False)
+-    name = db.Column(db.String(120), nullable=False)
+-    description = db.Column(db.Text, nullable=True)
+-    price = db.Column(db.Float, nullable=False)
+-    image_url = db.Column(db.String(255), nullable=True)
+-    created_at = db.Column(db.DateTime, default=datetime.now)
++    business_id = Column(Integer, ForeignKey('businesses.id'), nullable=False)
++    name = Column(String(120), nullable=False)
++    description = Column(Text, nullable=True)
++    price = Column(Float, nullable=False)
++    image_url = Column(String(255), nullable=True)
++    created_at = Column(DateTime, default=datetime.now)
+ 
+-    business = db.relationship('Business', backref='products', lazy=True)
++    business = relationship('Business', back_populates='products')
+ 
+ 
+-class Business(db.Model):
++class Business(Base):
+     __tablename__ = 'businesses'
+ 
+-    id = db.Column(db.Integer, primary_key=True)
+-    name = db.Column(db.String(120), nullable=False)
++    id = Column(Integer, primary_key=True)
++    name = Column(String(120), nullable=False)
+ 
+     # ✅ 1:1: each business has exactly one user login
+     # unique=True enforces "one user -> one business"
+-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, unique=True)
++    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, unique=True)
+ 
+     # ✅ NEW: WhatsApp phone number ID mapping
+     # Changed to BigInteger to support large phone number IDs
+-    phone_number_id = db.Column(db.BigInteger, unique=True, nullable=True)
++    phone_number_id = Column(BigInteger, unique=True, nullable=True)
+ 
+     # ✅ Business persona: defines the AI's personality/instructions
+-    persona = db.Column(db.Text, nullable=True)
++    persona = Column(Text, nullable=True)
+ 
+-    created_at = db.Column(db.DateTime, default=datetime.now)
++    created_at = Column(DateTime, default=datetime.now)
++    
++    # Relationships
++    user = relationship('User', back_populates='business')
++    products = relationship('Product', back_populates='business')
++    messages = relationship('Message', back_populates='business')
+Index: ai/run_ai.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/ai/run_ai.py b/ai/run_ai.py
+--- a/ai/run_ai.py
++++ b/ai/run_ai.py	(date 1770852807432)
+@@ -2,36 +2,22 @@
+ import os
+ import traceback
+ from dotenv import load_dotenv
+-from openai import OpenAI
++from openai import AsyncOpenAI
+ from pydantic import BaseModel, Field
+ from ai.prompts import system_prompt
+ from ai.tools import get_weather, get_exchange_rate, get_products, tools, get_rate
+-from ai.models import Message, db
++from ai.models import Message
+ from payment.payment import initialize_payment, verify_payment
+ 
+ load_dotenv()
+ 
+ api_key = os.getenv("OPENROUTER_API_KEY")
+ ai_model = os.getenv("OPEN_ROUTER_MODEL")
+-client = OpenAI(
++client = AsyncOpenAI(
+     base_url="https://openrouter.ai/api/v1",
+     api_key=api_key
+ )
+ 
+-# ✅ Store business_id as a context variable
+-_current_business_id = None
+-
+-
+-def set_business_context(business_id):
+-    """Set the business context for the current request"""
+-    global _current_business_id
+-    _current_business_id = business_id
+-
+-
+-def get_business_context():
+-    """Get the current business context"""
+-    return _current_business_id
+-
+ 
+ available_functions = {
+     "get_weather": get_weather,
+@@ -48,11 +34,11 @@
+     response: str = Field(description="A natural language response to the user query.")
+ 
+ 
+-def call_function(function_name, **kwargs):
++async def call_function(function_name, business_id=None, **kwargs):
+     """Call a function, injecting business_id if needed"""
+     # ✅ Inject business_id for get_products
+-    if function_name == "get_products" and _current_business_id:
+-        kwargs['business_id'] = _current_business_id
++    if function_name == "get_products" and business_id:
++        kwargs['business_id'] = business_id
+     if function_name == "initialize_payment" and 'callback_url' not in kwargs:
+         # Inject the default callback URL if not provided by the AI
+         kwargs['callback_url'] = f"{os.getenv('AI_BASE_URL')}/paystack/callback"
+@@ -60,7 +46,7 @@
+     return available_functions[function_name](**kwargs)
+ 
+ 
+-def get_ai_response(user_input, conversation_history=None, business_id=None, user_name=None):
++async def get_ai_response(user_input, conversation_history=None, business_id=None, user_name=None):
+     """
+     Get AI response with conversation context and tool calling.
+ 
+@@ -70,9 +56,6 @@
+         business_id: Optional business ID for context (used for WhatsApp and tool calls)
+         user_name: Optional name of the sender to personalize the response
+     """
+-    # ✅ Set business context for this request
+-    if business_id:
+-        set_business_context(business_id)
+ 
+     # 1. Build base messages
+     messages = [
+@@ -105,7 +88,7 @@
+ 
+     try:
+         # 2. First model call
+-        completion = client.chat.completions.create(
++        completion = await client.chat.completions.create(
+             model=ai_model,
+             messages=messages,
+             tools=tools,
+@@ -127,7 +110,7 @@
+                 print(f"Calling: {function_name} with {function_args}")
+ 
+                 # Execute the tool (business_id injected in call_function)
+-                function_result = call_function(function_name, **function_args)
++                function_result = await call_function(function_name, business_id=business_id, **function_args)
+                 print(f"Result: {function_result}")
+ 
+                 # Append tool result
+@@ -140,7 +123,7 @@
+ 
+                 # Second API call with function results
+                 if function_name == "get_weather":
+-                    second_completion = client.chat.completions.parse(
++                    second_completion = await client.chat.completions.parse(
+                         model="deepseek/deepseek-chat-v3.1",
+                         messages=messages,
+                         tools=tools,
+@@ -151,7 +134,7 @@
+                         return str(second_completion.choices[0].message.parsed.response)
+                     return second_completion.choices[0].message.content
+                 else:
+-                    second_completion = client.chat.completions.create(
++                    second_completion = await client.chat.completions.create(
+                         model=ai_model,
+                         messages=messages,
+                         tools=tools,
+@@ -165,31 +148,3 @@
+         traceback.print_exc()
+         print(f"Error: {e}")
+         return "Sorry, I'm having trouble responding right now."
+-
+-
+-def get_conversation_history(business_id, limit=20):
+-    """Retrieve recent conversation history for a specific business."""
+-
+-    recent_messages = Message.query.filter_by(business_id=business_id) \
+-        .order_by(Message.timestamp.desc()) \
+-        .limit(limit) \
+-        .all()
+-
+-    return [
+-        {'sender': msg.sender, 'text': msg.text}
+-        for msg in reversed(recent_messages)
+-    ]
+-
+-
+-def update_conversation_history(business_id, text, sender):
+-    """Save a message to the database."""
+-    new_msg = Message(business_id=business_id, text=text, sender=sender)
+-    db.session.add(new_msg)
+-    db.session.commit()
+-    return new_msg
+-
+-
+-def clear_conversation_history(business_id, sender):
+-    """Delete all messages associated with a specific business."""
+-    Message.query.filter_by(business_id=business_id, sender=sender).delete()
+-    db.session.commit()
+Index: ai/prompts.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/ai/prompts.py b/ai/prompts.py
+--- a/ai/prompts.py
++++ b/ai/prompts.py	(date 1770852595368)
+@@ -7,7 +7,7 @@
+ 4.**The Golden Rule of Commerce:** If a user expresses interest in a product or service, your priority is to facilitate the transaction. 
+    - Use `get_products` to show availability.
+    _ Calculate order total from the users selected product and pass it as the amount variable to the 'initialize_payment' funciton as it's required for payment..
+-   - Use `initialize_payment` to close the sale. Always ask for their email address politely if you don't have it and pass it as the customer_email variable to the 'initialize_payment' funciton, as it's required for payment.
++   - Use `initialize_payment` to close the sale. Always ask for their email address politely if you don't have it and pass it as the customer_email variable to the 'initialize_payment' funciton, as it's required for payment and send the payment link back to the user.
+ 4. Keep responses concise and conversational - avoid over-formatting with excessive emojis or bullet points
+ 5. Be helpful and warm, but not over-the-top enthusiastic
+ 6. **Only answer the current question - don't reference previous unrelated queries**
+Index: ai/base_models.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/ai/base_models.py b/ai/base_models.py
+new file mode 100644
+--- /dev/null	(date 1770853865841)
++++ b/ai/base_models.py	(date 1770853865841)
+@@ -0,0 +1,56 @@
++from datetime import datetime
++from pydantic import BaseModel, ConfigDict, EmailStr
++from typing import Optional, List
++
++
++# --- Pydantic Models (Schemas) ---
++
++
++class ProductSchema(BaseModel):
++    model_config = ConfigDict(from_attributes=True)
++
++    id: int
++    business_id: int
++    name: str
++    description: Optional[str] = None
++    price: float
++    image_url: Optional[str] = None
++    created_at: datetime
++
++
++class MessageSchema(BaseModel):
++    model_config = ConfigDict(from_attributes=True)
++
++    id: int
++    business_id: int
++    text: Optional[str] = None
++    sender: str
++    timestamp: datetime
++
++
++class BusinessSchema(BaseModel):
++    model_config = ConfigDict(from_attributes=True)
++
++    id: int
++    name: str
++    user_id: int
++    phone_number_id: Optional[int] = None
++    persona: Optional[str] = None
++    created_at: datetime
++
++    # Optional: include related data
++    products: List[ProductSchema] = []
++
++
++class UserSchema(BaseModel):
++    model_config = ConfigDict(from_attributes=True)
++
++    id: int
++    username: str
++    email: Optional[EmailStr] = None
++    created_at: datetime
++
++    # Nested business data
++    business: Optional[BusinessSchema] = None
++
++    # Note: We exclude password_hash for security
+Index: app.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/app.py b/app.py
+--- a/app.py
++++ b/app.py	(date 1770858789698)
+@@ -1,303 +1,494 @@
+ import os
+-from flask import Flask, render_template, request, redirect, url_for, flash
+-from ai.run_ai import get_ai_response
++import json
++import traceback
+ from dotenv import load_dotenv
+-from flask_migrate import Migrate
+-from flask_login import LoginManager, login_user, login_required, logout_user, current_user
+-from werkzeug.security import generate_password_hash
+-from ai.models import db, User, Message, Product, Business
+-from whatsapp_bot.app.views import webhook_blueprint
+-from whatsapp_bot.app.config import load_configurations, configure_logging
+ 
+ load_dotenv()
+-app = Flask(__name__)
++import requests
++from contextlib import asynccontextmanager
++from typing import Optional
++
++from fastapi import FastAPI, Request, Depends, Form, HTTPException, status, BackgroundTasks
++from fastapi.responses import HTMLResponse, RedirectResponse, PlainTextResponse
++from fastapi.staticfiles import StaticFiles
++from fastapi.templating import Jinja2Templates
++from starlette.middleware.sessions import SessionMiddleware
++from sqlalchemy import create_engine
++from sqlalchemy.orm import sessionmaker, Session
++from werkzeug.security import generate_password_hash
++
++from ai.run_ai import get_ai_response
++# Assuming ai.models defines Base, User, Message, Product, Business
++# If ai.models uses Flask-SQLAlchemy's db.Model, you might need to adjust imports there.
++from ai.models import User, Message, Product, Business, Base
++
++# Note: We are not using the 'db' object from Flask-SQLAlchemy, but we might need the Base/Models
++
++# from whatsapp_bot.app.views import webhook_blueprint # Webhooks need separate FastAPI router porting
++# from whatsapp_bot.app.config import load_configurations, configure_logging
++
++
++# --- Database Setup ---
++SQLALCHEMY_DATABASE_URL = os.getenv("CHATBOT_DB")
++engine = create_engine(SQLALCHEMY_DATABASE_URL)
++SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
++
++
++def get_db():
++    db = SessionLocal()
++    try:
++        yield db
++    finally:
++        db.close()
++
++
++# --- App Setup ---
++@asynccontextmanager
++async def lifespan(app: FastAPI):
++    # Create tables on startup (if using standard SQLAlchemy Base)
++    Base.metadata.create_all(bind=engine)
++    yield
++
++
++app = FastAPI(lifespan=lifespan)
++
++# Mount static files (CSS, JS, Images)
++# Ensure you have a 'static' directory
++app.mount("/static", StaticFiles(directory="static"), name="static")
++
++templates = Jinja2Templates(directory="templates")
++
++# Session Middleware for Auth (Replaces Flask-Login)
++app.add_middleware(
++    SessionMiddleware,
++    secret_key=os.getenv("SECRET_KEY"),
++    max_age=3600  # 1 hour
++)
+ 
+-# Configure WhatsApp Bot
+-load_configurations(app)
+-configure_logging()
+-app.register_blueprint(webhook_blueprint)
+ 
+-app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv("CHATBOT_DB")
+-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+-app.config['SECRET_KEY'] = os.getenv("SECRET_KEY")
++# --- Auth Helpers ---
+ 
+-db.init_app(app)
+-migrate = Migrate(app, db)
+-login_manager = LoginManager()
+-login_manager.init_app(app)
+-login_manager.login_view = 'login'
+-login_manager.login_message = 'Please log in to access the chat.'
+-login_manager.login_message_category = 'info'
++def get_current_user(request: Request, db: Session = Depends(get_db)):
++    user_id = request.session.get("user_id")
++    if not user_id:
++        return None
++    return db.query(User).filter(User.id == user_id).first()
+ 
+ 
+-@login_manager.user_loader
+-def load_user(user_id):
+-    """Load user from session"""
+-    return db.session.get(User, int(user_id))
++def login_required(request: Request, user: Optional[User] = Depends(get_current_user)):
++    if not user:
++        raise HTTPException(
++            status_code=status.HTTP_307_TEMPORARY_REDIRECT,
++            headers={"Location": "/login"}
++        )
++    return user
+ 
+ 
+-@app.route('/login', methods=['GET', 'POST'])
+-def login():
+-    """Login page"""
+-    if current_user.is_authenticated:
+-        return redirect(url_for('index'))
++# --- Routes ---
+ 
+-    if request.method == 'POST':
+-        username = request.form.get('username', '').strip()
+-        password = request.form.get('password', '')
+-        user = User.query.filter_by(username=username).first()
++@app.get("/login", response_class=HTMLResponse)
++async def login_page(request: Request):
++    return templates.TemplateResponse("login.html", {"request": request})
+ 
+-        # ✅ Fix: "user not found" should not say "fill in all fields"
+-        if not username or not password:
+-            flash('Please fill in all fields.', 'error')
+-            return redirect(url_for('login'))
++
++@app.post("/login")
++async def login(
++        request: Request,
++        username: str = Form(...),
++        password: str = Form(...),
++        db: Session = Depends(get_db)
++):
++    user = db.query(User).filter(User.username == username).first()
+ 
+-        if not user or not user.check_password(password):
+-            flash('Invalid username or password.', 'error')
+-            return redirect(url_for('login'))
++    if not user or not user.check_password(password):
++        return templates.TemplateResponse("login.html", {
++            "request": request,
++            "error": "Invalid username or password."
++        })
+ 
+-        login_user(user)
+-        flash(f'Welcome back, {username}!', 'success')
+-        return redirect(url_for('index'))
++    # Set session
++    request.session["user_id"] = user.id
++    return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
+ 
+-    return render_template('login.html')
+ 
++@app.get("/signup", response_class=HTMLResponse)
++async def signup_page(request: Request):
++    return templates.TemplateResponse("signup.html", {"request": request})
+ 
+-@app.route('/signup', methods=['GET', 'POST'])
+-def signup():
+-    """
+-    ✅ Signup now creates BOTH:
+-      - User (login)
+-      - Business (the account container)
+-    """
+-    if request.method == 'POST':
+-        username = (request.form.get('username') or '').strip()
+-        email = (request.form.get('email') or '').strip() or None
+-        password = request.form.get('password') or ''
+-        business_name = (request.form.get('business_name') or '').strip()
+-        # ✅ Optional: collect phone_number_id during signup
+-        phone_number_id = (request.form.get('phone_number_id') or '').strip() or None
+ 
+-        # Basic validation
+-        if not username or not password or not business_name:
+-            flash('Username, password, and business name are required.', 'error')
+-            return redirect(url_for('signup'))
++@app.post("/signup")
++async def signup(
++        request: Request,
++        username: str = Form(...),
++        password: str = Form(...),
++        business_name: str = Form(...),
++        email: Optional[str] = Form(None),
++        phone_number_id: Optional[str] = Form(None),
++        db: Session = Depends(get_db)
++):
++    if phone_number_id:
++        try:
++            # Ensure phone_number_id is stored as an integer/BigInteger
++            phone_number_id = int(phone_number_id.strip())
++        except ValueError:
++            return templates.TemplateResponse("signup.html", {"request": request, "error": "Invalid Phone Number ID. Must be a number."})
++    # Validation
++    if db.query(User).filter(User.username == username).first():
++        return templates.TemplateResponse("signup.html", {"request": request, "error": "Username exists."})
+ 
+-        # Prevent duplicates
+-        if User.query.filter_by(username=username).first():
+-            flash('Username already exists.', 'error')
+-            return redirect(url_for('signup'))
++    if email and db.query(User).filter(User.email == email).first():
++        return templates.TemplateResponse("signup.html", {"request": request, "error": "Email exists."})
+ 
+-        if email and User.query.filter_by(email=email).first():
+-            flash('Email already exists.', 'error')
+-            return redirect(url_for('signup'))
++    if phone_number_id and db.query(Business).filter(Business.phone_number_id == phone_number_id).first():
++        return templates.TemplateResponse("signup.html", {"request": request, "error": "Phone number registered."})
+ 
+-        if phone_number_id and Business.query.filter_by(phone_number_id=phone_number_id).first():
+-            flash('This WhatsApp phone number is already registered.', 'error')
+-            return redirect(url_for('signup'))
+-
+-        # Create new user
+-        new_user = User(
+-            username=username,
+-            email=email,
+-            password_hash=generate_password_hash(password, method='pbkdf2:sha256', salt_length=8)
+-        )
+-        db.session.add(new_user)
+-        db.session.flush()  # ensures new_user.id exists before Business insert
++    # Create User
++    new_user = User(
++        username=username,
++        email=email,
++        password_hash=generate_password_hash(password, method='pbkdf2:sha256', salt_length=8)
++    )
++    db.add(new_user)
++    db.flush()
+ 
+-        # Create the user's business (1:1)
+-        new_business = Business(
+-            name=business_name,
+-            user_id=new_user.id,
+-            phone_number_id=phone_number_id
+-        )
+-        db.session.add(new_business)
+-
+-        db.session.commit()
++    # Create Business
++    new_business = Business(
++        name=business_name,
++        user_id=new_user.id,
++        phone_number_id=phone_number_id
++    )
++    db.add(new_business)
++    db.commit()
+ 
+-        # Optional: auto-login after signup
+-        login_user(new_user)
+-        flash('Account created successfully!', 'success')
+-        return redirect(url_for('index'))
++    # Auto login
++    request.session["user_id"] = new_user.id
++    return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
+ 
+-    return render_template("signup.html")
+ 
++@app.get("/logout")
++async def logout(request: Request):
++    request.session.clear()
++    return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
+ 
+-@app.route('/logout')
+-@login_required
+-def logout():
+-    """Logout user"""
+-    logout_user()
+-    flash('You have been logged out.', 'info')
+-    return redirect(url_for('login'))
+ 
+-
+-@app.route('/', methods=['GET', 'POST'])
+-@login_required
+-def index():
+-    """
+-    ✅ Chat page - requires authentication
+-    Messages are now tied to the logged-in user's business.
+-    """
+-    business = current_user.business
++@app.get("/", response_class=HTMLResponse)
++async def index(
++        request: Request,
++        user: User = Depends(login_required),
++        db: Session = Depends(get_db)
++):
++    business = user.business
+     if not business:
+-        flash('No business found for this account. Please sign up again or contact support.', 'error')
+-        return redirect(url_for('logout'))
++        return RedirectResponse(url="/logout", status_code=status.HTTP_303_SEE_OTHER)
++
++    messages = db.query(Message).filter(Message.business_id == business.id).order_by(Message.timestamp.asc()).all()
++
++    display_messages = [
++        {
++            'text': msg.text,
++            'sender': msg.sender,
++            'timestamp': msg.timestamp.strftime('%I:%M %p')
++        }
++        for msg in messages
++    ]
++
++    return templates.TemplateResponse("index.html", {
++        "request": request,
++        "messages": display_messages,
++        "username": user.username
++    })
+ 
+-    if request.method == 'POST':
+-        user_message = request.form.get('message', '').strip()
++
++@app.post("/")
++async def chat(
++        request: Request,
++        message: str = Form(...),
++        user: User = Depends(login_required),
++        db: Session = Depends(get_db)
++):
++    business = user.business
++    user_message = message.strip()
+ 
+-        if user_message:
+-            # ✅ Get recent messages for THIS BUSINESS for context
+-            recent_messages = Message.query.filter_by(business_id=business.id) \
+-                .order_by(Message.timestamp.desc()) \
+-                .limit(20) \
+-                .all()
++    if user_message:
++        # Get context
++        recent_messages = db.query(Message).filter(Message.business_id == business.id) \
++            .order_by(Message.timestamp.desc()).limit(20).all()
+ 
+-            conversation_history = [
+-                {'text': msg.text, 'sender': msg.sender}
+-                for msg in reversed(recent_messages)
+-            ]
++        conversation_history = [
++            {'text': msg.text, 'sender': msg.sender}
++            for msg in reversed(recent_messages)
++        ]
+ 
+-            # ✅ Save user message (business-scoped)
+-            user_msg = Message(business_id=business.id, text=user_message, sender='user')
+-            db.session.add(user_msg)
+-            db.session.commit()
++        # Save User Message
++        user_msg = Message(business_id=business.id, text=user_message, sender='user')
++        db.add(user_msg)
++        db.commit()
+ 
+-            # ✅ Get AI response WITH context AND business_id
+-            bot_response = get_ai_response(
+-                user_message,
+-                conversation_history,
+-                business_id=business.id
+-            )
++        # Get AI Response (Async)
++        bot_response = await get_ai_response(
++            user_message,
++            conversation_history,
++            business_id=business.id
++        )
+ 
+-            # ✅ Save bot response (business-scoped)
+-            bot_msg = Message(business_id=business.id, text=bot_response, sender='bot')
+-            db.session.add(bot_msg)
+-            db.session.commit()
+-
+-        return redirect(url_for('index'))
++        # Save Bot Response
++        bot_msg = Message(business_id=business.id, text=bot_response, sender='bot')
++        db.add(bot_msg)
++        db.commit()
+ 
+-    # ✅ Display all messages for THIS BUSINESS
+-    messages = Message.query.filter_by(business_id=business.id) \
+-        .order_by(Message.timestamp.asc()) \
+-        .all()
++    return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
+ 
+-    display_messages = [
+-        {
+-            'text': msg.text,
+-            'sender': msg.sender,
+-            'timestamp': msg.timestamp.strftime('%I:%M %p')
+-        }
+-        for msg in messages
+-    ]
+ 
+-    return render_template('index.html', messages=display_messages, username=current_user.username)
++@app.post("/clear")
++async def clear_messages(
++        user: User = Depends(login_required),
++        db: Session = Depends(get_db)
++):
++    business = user.business
++    if business:
++        db.query(Message).filter(Message.business_id == business.id).delete()
++        db.commit()
++    return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
+ 
+ 
+-@app.route('/clear', methods=['GET', 'POST'])
+-@login_required
+-def clear_messages():
+-    """✅ Clear all messages for current business"""
+-    business = current_user.business
+-    if not business:
+-        flash('No business found.', 'error')
+-        return redirect(url_for('index'))
++@app.get("/products", response_class=HTMLResponse)
++async def products(
++        request: Request,
++        user: User = Depends(login_required),
++        db: Session = Depends(get_db)
++):
++    business = user.business
++    products_list = db.query(Product).filter(Product.business_id == business.id).all()
++    return templates.TemplateResponse("products.html", {"request": request, "products": products_list})
+ 
+-    Message.query.filter_by(business_id=business.id).delete()
+-    db.session.commit()
+-    flash('Messages cleared.', 'info')
+-    return redirect(url_for('index'))
+ 
+-
+-@app.route('/add_product', methods=['POST'])
+-@login_required
+-def add_product():
+-    """
+-    ✅ Add product for the logged-in user's business.
+-    IMPORTANT: we do NOT accept business_id from the form anymore (prevents abuse).
+-    """
+-    business = current_user.business
+-    if not business:
+-        flash('No business found.', 'error')
+-        return redirect(url_for('index'))
+-
+-    name = (request.form.get('name') or '').strip()
+-    description = (request.form.get('description') or '').strip()
+-    price_raw = (request.form.get('price') or '').strip()
+-    image_url = (request.form.get('image_url') or '').strip()
+-
+-    if not name or not price_raw:
+-        flash('Name and price are required.', 'error')
+-        return redirect(url_for('index'))
+-
++@app.post("/add_product")
++async def add_product(
++        request: Request,
++        name: str = Form(...),
++        price: str = Form(...),
++        description: Optional[str] = Form(None),
++        image_url: Optional[str] = Form(None),
++        user: User = Depends(login_required),
++        db: Session = Depends(get_db)
++):
++    business = user.business
+     try:
+-        price = float(price_raw)
++        price_float = float(price)
+     except ValueError:
+-        flash('Price must be a valid number.', 'error')
+-        return redirect(url_for('index'))
++        # In a real app, pass error back to template
++        return RedirectResponse(url="/products", status_code=status.HTTP_303_SEE_OTHER)
+ 
+     product = Product(
+         name=name,
+-        description=description if description else None,
+-        price=price,
+-        image_url=image_url if image_url else None,
++        description=description,
++        price=price_float,
++        image_url=image_url,
+         business_id=business.id
+     )
+-    db.session.add(product)
+-    db.session.commit()
+-    flash('Product added successfully!', 'success')
+-    return redirect(url_for('products'))
+-
++    db.add(product)
++    db.commit()
++    return RedirectResponse(url="/products", status_code=status.HTTP_303_SEE_OTHER)
+ 
+-@app.route('/products')
+-@login_required
+-def products():
+-    """✅ Display products for current business only"""
+-    business = current_user.business
+-    if not business:
+-        flash('No business found.', 'error')
+-        return redirect(url_for('index'))
+ 
+-    products = Product.query.filter_by(business_id=business.id).all()
+-    return render_template('products.html', products=products)
++@app.get("/settings", response_class=HTMLResponse)
++async def settings_page(
++        request: Request,
++        user: User = Depends(login_required)
++):
++    return templates.TemplateResponse("settings.html", {"request": request, "business": user.business})
+ 
+ 
+-@app.route('/settings', methods=['GET', 'POST'])
+-@login_required
+-def settings():
+-    """✅ Settings page to configure WhatsApp phone number"""
+-    business = current_user.business
+-    if not business:
+-        flash('No business found.', 'error')
+-        return redirect(url_for('index'))
++@app.post("/settings")
++async def update_settings(
++        request: Request,
++        phone_number_id: Optional[str] = Form(None),
++        persona: Optional[str] = Form(None),
++        user: User = Depends(login_required),
++        db: Session = Depends(get_db)
++):
++    business = user.business
+ 
+-    if request.method == 'POST':
+-        phone_number_id = (request.form.get('phone_number_id') or '').strip() or None
+-        persona = (request.form.get('persona') or '').strip() or None
+-
+-        # Check if phone number is already taken by another business
+-        if phone_number_id:
+-            existing = Business.query.filter(
+-                Business.phone_number_id == phone_number_id,
+-                Business.id != business.id
+-            ).first()
+-
+-            if existing:
+-                flash('This WhatsApp phone number is already registered to another business.', 'error')
+-                return redirect(url_for('settings'))
++    if phone_number_id:
++        try:
++            phone_number_id = int(phone_number_id.strip())
++        except ValueError:
++            return templates.TemplateResponse("settings.html", {"request": request, "business": business, "error": "Invalid Phone Number ID"})
++        existing = db.query(Business).filter(
++            Business.phone_number_id == phone_number_id,
++            Business.id != business.id
++        ).first()
++        if existing:
++            return templates.TemplateResponse("settings.html", {
++                "request": request,
++                "business": business,
++                "error": "Phone number already registered."
++            })
+ 
+-        business.phone_number_id = phone_number_id
+-        business.persona = persona
+-        db.session.commit()
+-        flash('Settings updated successfully!', 'success')
+-        return redirect(url_for('settings'))
++    business.phone_number_id = phone_number_id
++    business.persona = persona
++    db.commit()
+ 
+-    return render_template('settings.html', business=business)
++    return templates.TemplateResponse("settings.html", {
++        "request": request,
++        "business": business,
++        "success": "Settings updated."
++    })
+ 
+ 
++# --- WhatsApp Webhook ---
++
++@app.get("/webhook")
++async def verify_webhook(request: Request):
++    """
++    WhatsApp Webhook Verification
++    """
++    verify_token = os.getenv("WHATSAPP_VERIFY_TOKEN")
++    mode = request.query_params.get("hub.mode")
++    token = request.query_params.get("hub.verify_token")
++    challenge = request.query_params.get("hub.challenge")
++
++    if mode and token:
++        if mode == "subscribe" and token == verify_token:
++            return PlainTextResponse(content=challenge, status_code=200)
++        else:
++            raise HTTPException(status_code=403, detail="Verification failed")
++    return HTTPException(status_code=400, detail="Missing parameters")
++
++
++@app.post("/webhook")
++async def webhook_handler(request: Request, background_tasks: BackgroundTasks):
++    """
++    Handle incoming WhatsApp messages
++    """
++    print("🔔 EVENT: Webhook endpoint hit! (Request received)")
++    try:
++        data = await request.json()
++        # Process in background to respond quickly to WhatsApp
++        background_tasks.add_task(process_whatsapp_message, data)
++        return {"status": "ok"}
++    except Exception as e:
++        print(f"Error handling webhook: {e}")
++        return {"status": "error"}
++
++
++async def process_whatsapp_message(data):
++    """
++    Process the WhatsApp payload, generate AI response, and reply.
++    """
++    print("Processing background WhatsApp task...")
++    try:
++        entry = data.get("entry", [])[0]
++        changes = entry.get("changes", [])[0]
++        value = changes.get("value", {})
++        
++        # Check if it's a message
++        if "messages" not in value:
++            return
++
++        phone_number_id = value.get("metadata", {}).get("phone_number_id")
++        print(f"DEBUG: Webhook received for Phone Number ID: {phone_number_id}")
++        message_data = value.get("messages", [])[0]
++        
++        # Explicitly check for text messages
++        if message_data.get("type") != "text":
++            print("Ignored non-text message")
++            return
++            
++        from_number = message_data.get("from")
++        message_body = message_data.get("text", {}).get("body")
++
++        if not message_body or not phone_number_id:
++            return
++
++        # Use a fresh session for background task
++        with SessionLocal() as db:
++            # 1. Find the business associated with this WhatsApp Phone ID
++            # Cast phone_number_id to int because DB column is BigInteger
++            try:
++                pid_int = int(phone_number_id)
++            except (ValueError, TypeError):
++                print(f"Error: Received invalid phone_number_id: {phone_number_id}")
++                return
++
++            business = db.query(Business).filter(Business.phone_number_id == pid_int).first()
++            
++            if not business:
++                print(f"No business found for phone_number_id: {pid_int}")
++                # Send error message back to user so they know why it failed
++                whatsapp_token = os.getenv("ACCESS_TOKEN")
++                if whatsapp_token:
++                    url = f"https://graph.facebook.com/v17.0/{phone_number_id}/messages"
++                    headers = {
++                        "Authorization": f"Bearer {whatsapp_token}",
++                        "Content-Type": "application/json"
++                    }
++                    payload = {
++                        "messaging_product": "whatsapp",
++                        "to": from_number,
++                        "text": {"body": "System Error: No Business account found for this WhatsApp number. Please check your settings."}
++                    }
++                    requests.post(url, headers=headers, json=payload)
++                return
++            
++            print(f"Business found: {business.name} (ID: {business.id})")
++
++            # 2. Save User Message
++            user_msg = Message(business_id=business.id, text=message_body, sender=from_number)
++            db.add(user_msg)
++            db.commit()
++
++            # 3. Get Conversation History
++            recent_messages = db.query(Message).filter(Message.business_id == business.id) \
++                .order_by(Message.timestamp.desc()).limit(20).all()
++            
++            conversation_history = [
++                {'text': msg.text, 'sender': msg.sender}
++                for msg in reversed(recent_messages)
++            ]
++
++            # 4. Get AI Response
++            ai_response = await get_ai_response(
++                user_input=message_body,
++                conversation_history=conversation_history,
++                business_id=business.id,
++                user_name=from_number
++            )
++
++            # 5. Save Bot Response
++            bot_msg = Message(business_id=business.id, text=ai_response, sender='bot')
++            db.add(bot_msg)
++            db.commit()
++
++            # 6. Send Reply via WhatsApp API
++            whatsapp_token = os.getenv("ACCESS_TOKEN")
++            if not whatsapp_token:
++                print("Error: ACCESS_TOKEN is missing in environment variables.")
++                return
++
++            url = f"https://graph.facebook.com/v17.0/{phone_number_id}/messages"
++            headers = {
++                "Authorization": f"Bearer {whatsapp_token}",
++                "Content-Type": "application/json"
++            }
++            payload = {
++                "messaging_product": "whatsapp",
++                "to": from_number,
++                "text": {"body": ai_response}
++            }
++            
++            response = requests.post(url, headers=headers, json=payload)
++            if response.status_code not in (200, 201):
++                print(f"WhatsApp API Error {response.status_code}: {response.text}")
++            else:
++                print(f"Reply sent successfully to {from_number}")
++
++    except Exception as e:
++        print(f"Error processing WhatsApp message: {e}")
++        traceback.print_exc()
++
++
+ if __name__ == '__main__':
+-    with app.app_context():
+-        db.create_all()
++    import uvicorn
+ 
+-    app.run(host='0.0.0.0', debug=True, port=8000)
+\ No newline at end of file
++    uvicorn.run("app:app", host='0.0.0.0', port=8000, reload=True)
+Index: alembic/env.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/alembic/env.py b/alembic/env.py
+new file mode 100644
+--- /dev/null	(date 1770855866759)
++++ b/alembic/env.py	(date 1770855866759)
+@@ -0,0 +1,89 @@
++from logging.config import fileConfig
++import os
++from dotenv import load_dotenv
++
++from sqlalchemy import engine_from_config
++from sqlalchemy import pool
++
++from alembic import context
++
++# Load environment variables before importing models
++load_dotenv()
++
++from ai.models import Base, engine
++
++# this is the Alembic Config object, which provides
++# access to the values within the .ini file in use.
++config = context.config
++
++# Override sqlalchemy.url with the environment variable
++if os.getenv("CHATBOT_DB"):
++    config.set_main_option("sqlalchemy.url", os.getenv("CHATBOT_DB"))
++
++# Interpret the config file for Python logging.
++# This line sets up loggers basically.
++if config.config_file_name is not None:
++    fileConfig(config.config_file_name)
++
++# add your model's MetaData object here
++# for 'autogenerate' support
++# from myapp import mymodel
++# target_metadata = mymodel.Base.metadata
++target_metadata = Base.metadata
++
++# other values from the config, defined by the needs of env.py,
++# can be acquired:
++# my_important_option = config.get_main_option("my_important_option")
++# ... etc.
++
++
++def run_migrations_offline() -> None:
++    """Run migrations in 'offline' mode.
++
++    This configures the context with just a URL
++    and not an Engine, though an Engine is acceptable
++    here as well.  By skipping the Engine creation
++    we don't even need a DBAPI to be available.
++
++    Calls to context.execute() here emit the given string to the
++    script output.
++
++    """
++    url = config.get_main_option("sqlalchemy.url")
++    context.configure(
++        url=url,
++        target_metadata=target_metadata,
++        literal_binds=True,
++        dialect_opts={"paramstyle": "named"},
++    )
++
++    with context.begin_transaction():
++        context.run_migrations()
++
++
++def run_migrations_online() -> None:
++    """Run migrations in 'online' mode.
++
++    In this scenario we need to create an Engine
++    and associate a connection with the context.
++
++    """
++    connectable = engine_from_config(
++        config.get_section(config.config_ini_section, {}),
++        prefix="sqlalchemy.",
++        poolclass=pool.NullPool,
++    )
++
++    with connectable.connect() as connection:
++        context.configure(
++            connection=connection, target_metadata=target_metadata
++        )
++
++        with context.begin_transaction():
++            context.run_migrations()
++
++
++if context.is_offline_mode():
++    run_migrations_offline()
++else:
++    run_migrations_online()
+Index: alembic/README
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/alembic/README b/alembic/README
+new file mode 100644
+--- /dev/null	(date 1770855240730)
++++ b/alembic/README	(date 1770855240730)
+@@ -0,0 +1,1 @@
++Generic single-database configuration.
+\ No newline at end of file
+Index: alembic/script.py.mako
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/alembic/script.py.mako b/alembic/script.py.mako
+new file mode 100644
+--- /dev/null	(date 1770855240734)
++++ b/alembic/script.py.mako	(date 1770855240734)
+@@ -0,0 +1,28 @@
++"""${message}
++
++Revision ID: ${up_revision}
++Revises: ${down_revision | comma,n}
++Create Date: ${create_date}
++
++"""
++from typing import Sequence, Union
++
++from alembic import op
++import sqlalchemy as sa
++${imports if imports else ""}
++
++# revision identifiers, used by Alembic.
++revision: str = ${repr(up_revision)}
++down_revision: Union[str, Sequence[str], None] = ${repr(down_revision)}
++branch_labels: Union[str, Sequence[str], None] = ${repr(branch_labels)}
++depends_on: Union[str, Sequence[str], None] = ${repr(depends_on)}
++
++
++def upgrade() -> None:
++    """Upgrade schema."""
++    ${upgrades if upgrades else "pass"}
++
++
++def downgrade() -> None:
++    """Downgrade schema."""
++    ${downgrades if downgrades else "pass"}
+Index: main.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/main.py b/main.py
+new file mode 100644
+--- /dev/null	(date 1770852960679)
++++ b/main.py	(date 1770852960679)
+@@ -0,0 +1,6 @@
++def main():
++    print("Hello from aichatbot!")
++
++
++if __name__ == "__main__":
++    main()
+Index: uv.lock
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/uv.lock b/uv.lock
+new file mode 100644
+--- /dev/null	(date 1770854296547)
++++ b/uv.lock	(date 1770854296547)
+@@ -0,0 +1,347 @@
++version = 1
++revision = 3
++requires-python = ">=3.14"
++
++[[package]]
++name = "aichatbot"
++version = "0.1.0"
++source = { virtual = "." }
++dependencies = [
++    { name = "aiofiles" },
++    { name = "fastapi" },
++    { name = "jinja2" },
++    { name = "pydantic", extra = ["email"] },
++    { name = "python-multipart" },
++    { name = "sqlalchemy" },
++    { name = "uvicorn" },
++]
++
++[package.metadata]
++requires-dist = [
++    { name = "aiofiles", specifier = ">=25.1.0" },
++    { name = "fastapi", specifier = ">=0.128.8" },
++    { name = "jinja2", specifier = ">=3.1.6" },
++    { name = "pydantic", extras = ["email"], specifier = ">=2.12.5" },
++    { name = "python-multipart", specifier = ">=0.0.22" },
++    { name = "sqlalchemy", specifier = ">=2.0.46" },
++    { name = "uvicorn", specifier = ">=0.40.0" },
++]
++
++[[package]]
++name = "aiofiles"
++version = "25.1.0"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/41/c3/534eac40372d8ee36ef40df62ec129bee4fdb5ad9706e58a29be53b2c970/aiofiles-25.1.0.tar.gz", hash = "sha256:a8d728f0a29de45dc521f18f07297428d56992a742f0cd2701ba86e44d23d5b2", size = 46354, upload-time = "2025-10-09T20:51:04.358Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/bc/8a/340a1555ae33d7354dbca4faa54948d76d89a27ceef032c8c3bc661d003e/aiofiles-25.1.0-py3-none-any.whl", hash = "sha256:abe311e527c862958650f9438e859c1fa7568a141b22abcd015e120e86a85695", size = 14668, upload-time = "2025-10-09T20:51:03.174Z" },
++]
++
++[[package]]
++name = "annotated-doc"
++version = "0.0.4"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/57/ba/046ceea27344560984e26a590f90bc7f4a75b06701f653222458922b558c/annotated_doc-0.0.4.tar.gz", hash = "sha256:fbcda96e87e9c92ad167c2e53839e57503ecfda18804ea28102353485033faa4", size = 7288, upload-time = "2025-11-10T22:07:42.062Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/1e/d3/26bf1008eb3d2daa8ef4cacc7f3bfdc11818d111f7e2d0201bc6e3b49d45/annotated_doc-0.0.4-py3-none-any.whl", hash = "sha256:571ac1dc6991c450b25a9c2d84a3705e2ae7a53467b5d111c24fa8baabbed320", size = 5303, upload-time = "2025-11-10T22:07:40.673Z" },
++]
++
++[[package]]
++name = "annotated-types"
++version = "0.7.0"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/ee/67/531ea369ba64dcff5ec9c3402f9f51bf748cec26dde048a2f973a4eea7f5/annotated_types-0.7.0.tar.gz", hash = "sha256:aff07c09a53a08bc8cfccb9c85b05f1aa9a2a6f23728d790723543408344ce89", size = 16081, upload-time = "2024-05-20T21:33:25.928Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/78/b6/6307fbef88d9b5ee7421e68d78a9f162e0da4900bc5f5793f6d3d0e34fb8/annotated_types-0.7.0-py3-none-any.whl", hash = "sha256:1f02e8b43a8fbbc3f3e0d4f0f4bfc8131bcb4eebe8849b8e5c773f3a1c582a53", size = 13643, upload-time = "2024-05-20T21:33:24.1Z" },
++]
++
++[[package]]
++name = "anyio"
++version = "4.12.1"
++source = { registry = "https://pypi.org/simple" }
++dependencies = [
++    { name = "idna" },
++]
++sdist = { url = "https://files.pythonhosted.org/packages/96/f0/5eb65b2bb0d09ac6776f2eb54adee6abe8228ea05b20a5ad0e4945de8aac/anyio-4.12.1.tar.gz", hash = "sha256:41cfcc3a4c85d3f05c932da7c26d0201ac36f72abd4435ba90d0464a3ffed703", size = 228685, upload-time = "2026-01-06T11:45:21.246Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/38/0e/27be9fdef66e72d64c0cdc3cc2823101b80585f8119b5c112c2e8f5f7dab/anyio-4.12.1-py3-none-any.whl", hash = "sha256:d405828884fc140aa80a3c667b8beed277f1dfedec42ba031bd6ac3db606ab6c", size = 113592, upload-time = "2026-01-06T11:45:19.497Z" },
++]
++
++[[package]]
++name = "click"
++version = "8.3.1"
++source = { registry = "https://pypi.org/simple" }
++dependencies = [
++    { name = "colorama", marker = "sys_platform == 'win32'" },
++]
++sdist = { url = "https://files.pythonhosted.org/packages/3d/fa/656b739db8587d7b5dfa22e22ed02566950fbfbcdc20311993483657a5c0/click-8.3.1.tar.gz", hash = "sha256:12ff4785d337a1bb490bb7e9c2b1ee5da3112e94a8622f26a6c77f5d2fc6842a", size = 295065, upload-time = "2025-11-15T20:45:42.706Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/98/78/01c019cdb5d6498122777c1a43056ebb3ebfeef2076d9d026bfe15583b2b/click-8.3.1-py3-none-any.whl", hash = "sha256:981153a64e25f12d547d3426c367a4857371575ee7ad18df2a6183ab0545b2a6", size = 108274, upload-time = "2025-11-15T20:45:41.139Z" },
++]
++
++[[package]]
++name = "colorama"
++version = "0.4.6"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/d8/53/6f443c9a4a8358a93a6792e2acffb9d9d5cb0a5cfd8802644b7b1c9a02e4/colorama-0.4.6.tar.gz", hash = "sha256:08695f5cb7ed6e0531a20572697297273c47b8cae5a63ffc6d6ed5c201be6e44", size = 27697, upload-time = "2022-10-25T02:36:22.414Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/d1/d6/3965ed04c63042e047cb6a3e6ed1a63a35087b6a609aa3a15ed8ac56c221/colorama-0.4.6-py2.py3-none-any.whl", hash = "sha256:4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6", size = 25335, upload-time = "2022-10-25T02:36:20.889Z" },
++]
++
++[[package]]
++name = "dnspython"
++version = "2.8.0"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/8c/8b/57666417c0f90f08bcafa776861060426765fdb422eb10212086fb811d26/dnspython-2.8.0.tar.gz", hash = "sha256:181d3c6996452cb1189c4046c61599b84a5a86e099562ffde77d26984ff26d0f", size = 368251, upload-time = "2025-09-07T18:58:00.022Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/ba/5a/18ad964b0086c6e62e2e7500f7edc89e3faa45033c71c1893d34eed2b2de/dnspython-2.8.0-py3-none-any.whl", hash = "sha256:01d9bbc4a2d76bf0db7c1f729812ded6d912bd318d3b1cf81d30c0f845dbf3af", size = 331094, upload-time = "2025-09-07T18:57:58.071Z" },
++]
++
++[[package]]
++name = "email-validator"
++version = "2.3.0"
++source = { registry = "https://pypi.org/simple" }
++dependencies = [
++    { name = "dnspython" },
++    { name = "idna" },
++]
++sdist = { url = "https://files.pythonhosted.org/packages/f5/22/900cb125c76b7aaa450ce02fd727f452243f2e91a61af068b40adba60ea9/email_validator-2.3.0.tar.gz", hash = "sha256:9fc05c37f2f6cf439ff414f8fc46d917929974a82244c20eb10231ba60c54426", size = 51238, upload-time = "2025-08-26T13:09:06.831Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/de/15/545e2b6cf2e3be84bc1ed85613edd75b8aea69807a71c26f4ca6a9258e82/email_validator-2.3.0-py3-none-any.whl", hash = "sha256:80f13f623413e6b197ae73bb10bf4eb0908faf509ad8362c5edeb0be7fd450b4", size = 35604, upload-time = "2025-08-26T13:09:05.858Z" },
++]
++
++[[package]]
++name = "fastapi"
++version = "0.128.8"
++source = { registry = "https://pypi.org/simple" }
++dependencies = [
++    { name = "annotated-doc" },
++    { name = "pydantic" },
++    { name = "starlette" },
++    { name = "typing-extensions" },
++    { name = "typing-inspection" },
++]
++sdist = { url = "https://files.pythonhosted.org/packages/01/72/0df5c58c954742f31a7054e2dd1143bae0b408b7f36b59b85f928f9b456c/fastapi-0.128.8.tar.gz", hash = "sha256:3171f9f328c4a218f0a8d2ba8310ac3a55d1ee12c28c949650288aee25966007", size = 375523, upload-time = "2026-02-11T15:19:36.69Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/9f/37/37b07e276f8923c69a5df266bfcb5bac4ba8b55dfe4a126720f8c48681d1/fastapi-0.128.8-py3-none-any.whl", hash = "sha256:5618f492d0fe973a778f8fec97723f598aa9deee495040a8d51aaf3cf123ecf1", size = 103630, upload-time = "2026-02-11T15:19:35.209Z" },
++]
++
++[[package]]
++name = "greenlet"
++version = "3.3.1"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/8a/99/1cd3411c56a410994669062bd73dd58270c00cc074cac15f385a1fd91f8a/greenlet-3.3.1.tar.gz", hash = "sha256:41848f3230b58c08bb43dee542e74a2a2e34d3c59dc3076cec9151aeeedcae98", size = 184690, upload-time = "2026-01-23T15:31:02.076Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/ae/fb/011c7c717213182caf78084a9bea51c8590b0afda98001f69d9f853a495b/greenlet-3.3.1-cp314-cp314-macosx_11_0_universal2.whl", hash = "sha256:bd59acd8529b372775cd0fcbc5f420ae20681c5b045ce25bd453ed8455ab99b5", size = 275737, upload-time = "2026-01-23T15:32:16.889Z" },
++    { url = "https://files.pythonhosted.org/packages/41/2e/a3a417d620363fdbb08a48b1dd582956a46a61bf8fd27ee8164f9dfe87c2/greenlet-3.3.1-cp314-cp314-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:b31c05dd84ef6871dd47120386aed35323c944d86c3d91a17c4b8d23df62f15b", size = 646422, upload-time = "2026-01-23T16:01:00.354Z" },
++    { url = "https://files.pythonhosted.org/packages/b4/09/c6c4a0db47defafd2d6bab8ddfe47ad19963b4e30f5bed84d75328059f8c/greenlet-3.3.1-cp314-cp314-manylinux_2_24_ppc64le.manylinux_2_28_ppc64le.whl", hash = "sha256:02925a0bfffc41e542c70aa14c7eda3593e4d7e274bfcccca1827e6c0875902e", size = 658219, upload-time = "2026-01-23T16:05:30.956Z" },
++    { url = "https://files.pythonhosted.org/packages/80/38/9d42d60dffb04b45f03dbab9430898352dba277758640751dc5cc316c521/greenlet-3.3.1-cp314-cp314-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:34a729e2e4e4ffe9ae2408d5ecaf12f944853f40ad724929b7585bca808a9d6f", size = 660237, upload-time = "2026-01-23T15:32:53.967Z" },
++    { url = "https://files.pythonhosted.org/packages/96/61/373c30b7197f9e756e4c81ae90a8d55dc3598c17673f91f4d31c3c689c3f/greenlet-3.3.1-cp314-cp314-musllinux_1_2_aarch64.whl", hash = "sha256:aec9ab04e82918e623415947921dea15851b152b822661cce3f8e4393c3df683", size = 1615261, upload-time = "2026-01-23T16:04:25.066Z" },
++    { url = "https://files.pythonhosted.org/packages/fd/d3/ca534310343f5945316f9451e953dcd89b36fe7a19de652a1dc5a0eeef3f/greenlet-3.3.1-cp314-cp314-musllinux_1_2_x86_64.whl", hash = "sha256:71c767cf281a80d02b6c1bdc41c9468e1f5a494fb11bc8688c360524e273d7b1", size = 1683719, upload-time = "2026-01-23T15:33:50.61Z" },
++    { url = "https://files.pythonhosted.org/packages/52/cb/c21a3fd5d2c9c8b622e7bede6d6d00e00551a5ee474ea6d831b5f567a8b4/greenlet-3.3.1-cp314-cp314-win_amd64.whl", hash = "sha256:96aff77af063b607f2489473484e39a0bbae730f2ea90c9e5606c9b73c44174a", size = 228125, upload-time = "2026-01-23T15:32:45.265Z" },
++    { url = "https://files.pythonhosted.org/packages/6a/8e/8a2db6d11491837af1de64b8aff23707c6e85241be13c60ed399a72e2ef8/greenlet-3.3.1-cp314-cp314-win_arm64.whl", hash = "sha256:b066e8b50e28b503f604fa538adc764a638b38cf8e81e025011d26e8a627fa79", size = 227519, upload-time = "2026-01-23T15:31:47.284Z" },
++    { url = "https://files.pythonhosted.org/packages/28/24/cbbec49bacdcc9ec652a81d3efef7b59f326697e7edf6ed775a5e08e54c2/greenlet-3.3.1-cp314-cp314t-macosx_11_0_universal2.whl", hash = "sha256:3e63252943c921b90abb035ebe9de832c436401d9c45f262d80e2d06cc659242", size = 282706, upload-time = "2026-01-23T15:33:05.525Z" },
++    { url = "https://files.pythonhosted.org/packages/86/2e/4f2b9323c144c4fe8842a4e0d92121465485c3c2c5b9e9b30a52e80f523f/greenlet-3.3.1-cp314-cp314t-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:76e39058e68eb125de10c92524573924e827927df5d3891fbc97bd55764a8774", size = 651209, upload-time = "2026-01-23T16:01:01.517Z" },
++    { url = "https://files.pythonhosted.org/packages/d9/87/50ca60e515f5bb55a2fbc5f0c9b5b156de7d2fc51a0a69abc9d23914a237/greenlet-3.3.1-cp314-cp314t-manylinux_2_24_ppc64le.manylinux_2_28_ppc64le.whl", hash = "sha256:c9f9d5e7a9310b7a2f416dd13d2e3fd8b42d803968ea580b7c0f322ccb389b97", size = 654300, upload-time = "2026-01-23T16:05:32.199Z" },
++    { url = "https://files.pythonhosted.org/packages/1d/94/74310866dfa2b73dd08659a3d18762f83985ad3281901ba0ee9a815194fb/greenlet-3.3.1-cp314-cp314t-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:92497c78adf3ac703b57f1e3813c2d874f27f71a178f9ea5887855da413cd6d2", size = 653842, upload-time = "2026-01-23T15:32:55.671Z" },
++    { url = "https://files.pythonhosted.org/packages/97/43/8bf0ffa3d498eeee4c58c212a3905dd6146c01c8dc0b0a046481ca29b18c/greenlet-3.3.1-cp314-cp314t-musllinux_1_2_aarch64.whl", hash = "sha256:ed6b402bc74d6557a705e197d47f9063733091ed6357b3de33619d8a8d93ac53", size = 1614917, upload-time = "2026-01-23T16:04:26.276Z" },
++    { url = "https://files.pythonhosted.org/packages/89/90/a3be7a5f378fc6e84abe4dcfb2ba32b07786861172e502388b4c90000d1b/greenlet-3.3.1-cp314-cp314t-musllinux_1_2_x86_64.whl", hash = "sha256:59913f1e5ada20fde795ba906916aea25d442abcc0593fba7e26c92b7ad76249", size = 1676092, upload-time = "2026-01-23T15:33:52.176Z" },
++    { url = "https://files.pythonhosted.org/packages/e1/2b/98c7f93e6db9977aaee07eb1e51ca63bd5f779b900d362791d3252e60558/greenlet-3.3.1-cp314-cp314t-win_amd64.whl", hash = "sha256:301860987846c24cb8964bdec0e31a96ad4a2a801b41b4ef40963c1b44f33451", size = 233181, upload-time = "2026-01-23T15:33:00.29Z" },
++]
++
++[[package]]
++name = "h11"
++version = "0.16.0"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/01/ee/02a2c011bdab74c6fb3c75474d40b3052059d95df7e73351460c8588d963/h11-0.16.0.tar.gz", hash = "sha256:4e35b956cf45792e4caa5885e69fba00bdbc6ffafbfa020300e549b208ee5ff1", size = 101250, upload-time = "2025-04-24T03:35:25.427Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/04/4b/29cac41a4d98d144bf5f6d33995617b185d14b22401f75ca86f384e87ff1/h11-0.16.0-py3-none-any.whl", hash = "sha256:63cf8bbe7522de3bf65932fda1d9c2772064ffb3dae62d55932da54b31cb6c86", size = 37515, upload-time = "2025-04-24T03:35:24.344Z" },
++]
++
++[[package]]
++name = "idna"
++version = "3.11"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/6f/6d/0703ccc57f3a7233505399edb88de3cbd678da106337b9fcde432b65ed60/idna-3.11.tar.gz", hash = "sha256:795dafcc9c04ed0c1fb032c2aa73654d8e8c5023a7df64a53f39190ada629902", size = 194582, upload-time = "2025-10-12T14:55:20.501Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/0e/61/66938bbb5fc52dbdf84594873d5b51fb1f7c7794e9c0f5bd885f30bc507b/idna-3.11-py3-none-any.whl", hash = "sha256:771a87f49d9defaf64091e6e6fe9c18d4833f140bd19464795bc32d966ca37ea", size = 71008, upload-time = "2025-10-12T14:55:18.883Z" },
++]
++
++[[package]]
++name = "jinja2"
++version = "3.1.6"
++source = { registry = "https://pypi.org/simple" }
++dependencies = [
++    { name = "markupsafe" },
++]
++sdist = { url = "https://files.pythonhosted.org/packages/df/bf/f7da0350254c0ed7c72f3e33cef02e048281fec7ecec5f032d4aac52226b/jinja2-3.1.6.tar.gz", hash = "sha256:0137fb05990d35f1275a587e9aee6d56da821fc83491a0fb838183be43f66d6d", size = 245115, upload-time = "2025-03-05T20:05:02.478Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/62/a1/3d680cbfd5f4b8f15abc1d571870c5fc3e594bb582bc3b64ea099db13e56/jinja2-3.1.6-py3-none-any.whl", hash = "sha256:85ece4451f492d0c13c5dd7c13a64681a86afae63a5f347908daf103ce6d2f67", size = 134899, upload-time = "2025-03-05T20:05:00.369Z" },
++]
++
++[[package]]
++name = "markupsafe"
++version = "3.0.3"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/7e/99/7690b6d4034fffd95959cbe0c02de8deb3098cc577c67bb6a24fe5d7caa7/markupsafe-3.0.3.tar.gz", hash = "sha256:722695808f4b6457b320fdc131280796bdceb04ab50fe1795cd540799ebe1698", size = 80313, upload-time = "2025-09-27T18:37:40.426Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/33/8a/8e42d4838cd89b7dde187011e97fe6c3af66d8c044997d2183fbd6d31352/markupsafe-3.0.3-cp314-cp314-macosx_10_13_x86_64.whl", hash = "sha256:eaa9599de571d72e2daf60164784109f19978b327a3910d3e9de8c97b5b70cfe", size = 11619, upload-time = "2025-09-27T18:37:06.342Z" },
++    { url = "https://files.pythonhosted.org/packages/b5/64/7660f8a4a8e53c924d0fa05dc3a55c9cee10bbd82b11c5afb27d44b096ce/markupsafe-3.0.3-cp314-cp314-macosx_11_0_arm64.whl", hash = "sha256:c47a551199eb8eb2121d4f0f15ae0f923d31350ab9280078d1e5f12b249e0026", size = 12029, upload-time = "2025-09-27T18:37:07.213Z" },
++    { url = "https://files.pythonhosted.org/packages/da/ef/e648bfd021127bef5fa12e1720ffed0c6cbb8310c8d9bea7266337ff06de/markupsafe-3.0.3-cp314-cp314-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:f34c41761022dd093b4b6896d4810782ffbabe30f2d443ff5f083e0cbbb8c737", size = 24408, upload-time = "2025-09-27T18:37:09.572Z" },
++    { url = "https://files.pythonhosted.org/packages/41/3c/a36c2450754618e62008bf7435ccb0f88053e07592e6028a34776213d877/markupsafe-3.0.3-cp314-cp314-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:457a69a9577064c05a97c41f4e65148652db078a3a509039e64d3467b9e7ef97", size = 23005, upload-time = "2025-09-27T18:37:10.58Z" },
++    { url = "https://files.pythonhosted.org/packages/bc/20/b7fdf89a8456b099837cd1dc21974632a02a999ec9bf7ca3e490aacd98e7/markupsafe-3.0.3-cp314-cp314-manylinux_2_31_riscv64.manylinux_2_39_riscv64.whl", hash = "sha256:e8afc3f2ccfa24215f8cb28dcf43f0113ac3c37c2f0f0806d8c70e4228c5cf4d", size = 22048, upload-time = "2025-09-27T18:37:11.547Z" },
++    { url = "https://files.pythonhosted.org/packages/9a/a7/591f592afdc734f47db08a75793a55d7fbcc6902a723ae4cfbab61010cc5/markupsafe-3.0.3-cp314-cp314-musllinux_1_2_aarch64.whl", hash = "sha256:ec15a59cf5af7be74194f7ab02d0f59a62bdcf1a537677ce67a2537c9b87fcda", size = 23821, upload-time = "2025-09-27T18:37:12.48Z" },
++    { url = "https://files.pythonhosted.org/packages/7d/33/45b24e4f44195b26521bc6f1a82197118f74df348556594bd2262bda1038/markupsafe-3.0.3-cp314-cp314-musllinux_1_2_riscv64.whl", hash = "sha256:0eb9ff8191e8498cca014656ae6b8d61f39da5f95b488805da4bb029cccbfbaf", size = 21606, upload-time = "2025-09-27T18:37:13.485Z" },
++    { url = "https://files.pythonhosted.org/packages/ff/0e/53dfaca23a69fbfbbf17a4b64072090e70717344c52eaaaa9c5ddff1e5f0/markupsafe-3.0.3-cp314-cp314-musllinux_1_2_x86_64.whl", hash = "sha256:2713baf880df847f2bece4230d4d094280f4e67b1e813eec43b4c0e144a34ffe", size = 23043, upload-time = "2025-09-27T18:37:14.408Z" },
++    { url = "https://files.pythonhosted.org/packages/46/11/f333a06fc16236d5238bfe74daccbca41459dcd8d1fa952e8fbd5dccfb70/markupsafe-3.0.3-cp314-cp314-win32.whl", hash = "sha256:729586769a26dbceff69f7a7dbbf59ab6572b99d94576a5592625d5b411576b9", size = 14747, upload-time = "2025-09-27T18:37:15.36Z" },
++    { url = "https://files.pythonhosted.org/packages/28/52/182836104b33b444e400b14f797212f720cbc9ed6ba34c800639d154e821/markupsafe-3.0.3-cp314-cp314-win_amd64.whl", hash = "sha256:bdc919ead48f234740ad807933cdf545180bfbe9342c2bb451556db2ed958581", size = 15341, upload-time = "2025-09-27T18:37:16.496Z" },
++    { url = "https://files.pythonhosted.org/packages/6f/18/acf23e91bd94fd7b3031558b1f013adfa21a8e407a3fdb32745538730382/markupsafe-3.0.3-cp314-cp314-win_arm64.whl", hash = "sha256:5a7d5dc5140555cf21a6fefbdbf8723f06fcd2f63ef108f2854de715e4422cb4", size = 14073, upload-time = "2025-09-27T18:37:17.476Z" },
++    { url = "https://files.pythonhosted.org/packages/3c/f0/57689aa4076e1b43b15fdfa646b04653969d50cf30c32a102762be2485da/markupsafe-3.0.3-cp314-cp314t-macosx_10_13_x86_64.whl", hash = "sha256:1353ef0c1b138e1907ae78e2f6c63ff67501122006b0f9abad68fda5f4ffc6ab", size = 11661, upload-time = "2025-09-27T18:37:18.453Z" },
++    { url = "https://files.pythonhosted.org/packages/89/c3/2e67a7ca217c6912985ec766c6393b636fb0c2344443ff9d91404dc4c79f/markupsafe-3.0.3-cp314-cp314t-macosx_11_0_arm64.whl", hash = "sha256:1085e7fbddd3be5f89cc898938f42c0b3c711fdcb37d75221de2666af647c175", size = 12069, upload-time = "2025-09-27T18:37:19.332Z" },
++    { url = "https://files.pythonhosted.org/packages/f0/00/be561dce4e6ca66b15276e184ce4b8aec61fe83662cce2f7d72bd3249d28/markupsafe-3.0.3-cp314-cp314t-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:1b52b4fb9df4eb9ae465f8d0c228a00624de2334f216f178a995ccdcf82c4634", size = 25670, upload-time = "2025-09-27T18:37:20.245Z" },
++    { url = "https://files.pythonhosted.org/packages/50/09/c419f6f5a92e5fadde27efd190eca90f05e1261b10dbd8cbcb39cd8ea1dc/markupsafe-3.0.3-cp314-cp314t-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:fed51ac40f757d41b7c48425901843666a6677e3e8eb0abcff09e4ba6e664f50", size = 23598, upload-time = "2025-09-27T18:37:21.177Z" },
++    { url = "https://files.pythonhosted.org/packages/22/44/a0681611106e0b2921b3033fc19bc53323e0b50bc70cffdd19f7d679bb66/markupsafe-3.0.3-cp314-cp314t-manylinux_2_31_riscv64.manylinux_2_39_riscv64.whl", hash = "sha256:f190daf01f13c72eac4efd5c430a8de82489d9cff23c364c3ea822545032993e", size = 23261, upload-time = "2025-09-27T18:37:22.167Z" },
++    { url = "https://files.pythonhosted.org/packages/5f/57/1b0b3f100259dc9fffe780cfb60d4be71375510e435efec3d116b6436d43/markupsafe-3.0.3-cp314-cp314t-musllinux_1_2_aarch64.whl", hash = "sha256:e56b7d45a839a697b5eb268c82a71bd8c7f6c94d6fd50c3d577fa39a9f1409f5", size = 24835, upload-time = "2025-09-27T18:37:23.296Z" },
++    { url = "https://files.pythonhosted.org/packages/26/6a/4bf6d0c97c4920f1597cc14dd720705eca0bf7c787aebc6bb4d1bead5388/markupsafe-3.0.3-cp314-cp314t-musllinux_1_2_riscv64.whl", hash = "sha256:f3e98bb3798ead92273dc0e5fd0f31ade220f59a266ffd8a4f6065e0a3ce0523", size = 22733, upload-time = "2025-09-27T18:37:24.237Z" },
++    { url = "https://files.pythonhosted.org/packages/14/c7/ca723101509b518797fedc2fdf79ba57f886b4aca8a7d31857ba3ee8281f/markupsafe-3.0.3-cp314-cp314t-musllinux_1_2_x86_64.whl", hash = "sha256:5678211cb9333a6468fb8d8be0305520aa073f50d17f089b5b4b477ea6e67fdc", size = 23672, upload-time = "2025-09-27T18:37:25.271Z" },
++    { url = "https://files.pythonhosted.org/packages/fb/df/5bd7a48c256faecd1d36edc13133e51397e41b73bb77e1a69deab746ebac/markupsafe-3.0.3-cp314-cp314t-win32.whl", hash = "sha256:915c04ba3851909ce68ccc2b8e2cd691618c4dc4c4232fb7982bca3f41fd8c3d", size = 14819, upload-time = "2025-09-27T18:37:26.285Z" },
++    { url = "https://files.pythonhosted.org/packages/1a/8a/0402ba61a2f16038b48b39bccca271134be00c5c9f0f623208399333c448/markupsafe-3.0.3-cp314-cp314t-win_amd64.whl", hash = "sha256:4faffd047e07c38848ce017e8725090413cd80cbc23d86e55c587bf979e579c9", size = 15426, upload-time = "2025-09-27T18:37:27.316Z" },
++    { url = "https://files.pythonhosted.org/packages/70/bc/6f1c2f612465f5fa89b95bead1f44dcb607670fd42891d8fdcd5d039f4f4/markupsafe-3.0.3-cp314-cp314t-win_arm64.whl", hash = "sha256:32001d6a8fc98c8cb5c947787c5d08b0a50663d139f1305bac5885d98d9b40fa", size = 14146, upload-time = "2025-09-27T18:37:28.327Z" },
++]
++
++[[package]]
++name = "pydantic"
++version = "2.12.5"
++source = { registry = "https://pypi.org/simple" }
++dependencies = [
++    { name = "annotated-types" },
++    { name = "pydantic-core" },
++    { name = "typing-extensions" },
++    { name = "typing-inspection" },
++]
++sdist = { url = "https://files.pythonhosted.org/packages/69/44/36f1a6e523abc58ae5f928898e4aca2e0ea509b5aa6f6f392a5d882be928/pydantic-2.12.5.tar.gz", hash = "sha256:4d351024c75c0f085a9febbb665ce8c0c6ec5d30e903bdb6394b7ede26aebb49", size = 821591, upload-time = "2025-11-26T15:11:46.471Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/5a/87/b70ad306ebb6f9b585f114d0ac2137d792b48be34d732d60e597c2f8465a/pydantic-2.12.5-py3-none-any.whl", hash = "sha256:e561593fccf61e8a20fc46dfc2dfe075b8be7d0188df33f221ad1f0139180f9d", size = 463580, upload-time = "2025-11-26T15:11:44.605Z" },
++]
++
++[package.optional-dependencies]
++email = [
++    { name = "email-validator" },
++]
++
++[[package]]
++name = "pydantic-core"
++version = "2.41.5"
++source = { registry = "https://pypi.org/simple" }
++dependencies = [
++    { name = "typing-extensions" },
++]
++sdist = { url = "https://files.pythonhosted.org/packages/71/70/23b021c950c2addd24ec408e9ab05d59b035b39d97cdc1130e1bce647bb6/pydantic_core-2.41.5.tar.gz", hash = "sha256:08daa51ea16ad373ffd5e7606252cc32f07bc72b28284b6bc9c6df804816476e", size = 460952, upload-time = "2025-11-04T13:43:49.098Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/ea/28/46b7c5c9635ae96ea0fbb779e271a38129df2550f763937659ee6c5dbc65/pydantic_core-2.41.5-cp314-cp314-macosx_10_12_x86_64.whl", hash = "sha256:3f37a19d7ebcdd20b96485056ba9e8b304e27d9904d233d7b1015db320e51f0a", size = 2119622, upload-time = "2025-11-04T13:40:56.68Z" },
++    { url = "https://files.pythonhosted.org/packages/74/1a/145646e5687e8d9a1e8d09acb278c8535ebe9e972e1f162ed338a622f193/pydantic_core-2.41.5-cp314-cp314-macosx_11_0_arm64.whl", hash = "sha256:1d1d9764366c73f996edd17abb6d9d7649a7eb690006ab6adbda117717099b14", size = 1891725, upload-time = "2025-11-04T13:40:58.807Z" },
++    { url = "https://files.pythonhosted.org/packages/23/04/e89c29e267b8060b40dca97bfc64a19b2a3cf99018167ea1677d96368273/pydantic_core-2.41.5-cp314-cp314-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:25e1c2af0fce638d5f1988b686f3b3ea8cd7de5f244ca147c777769e798a9cd1", size = 1915040, upload-time = "2025-11-04T13:41:00.853Z" },
++    { url = "https://files.pythonhosted.org/packages/84/a3/15a82ac7bd97992a82257f777b3583d3e84bdb06ba6858f745daa2ec8a85/pydantic_core-2.41.5-cp314-cp314-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:506d766a8727beef16b7adaeb8ee6217c64fc813646b424d0804d67c16eddb66", size = 2063691, upload-time = "2025-11-04T13:41:03.504Z" },
++    { url = "https://files.pythonhosted.org/packages/74/9b/0046701313c6ef08c0c1cf0e028c67c770a4e1275ca73131563c5f2a310a/pydantic_core-2.41.5-cp314-cp314-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:4819fa52133c9aa3c387b3328f25c1facc356491e6135b459f1de698ff64d869", size = 2213897, upload-time = "2025-11-04T13:41:05.804Z" },
++    { url = "https://files.pythonhosted.org/packages/8a/cd/6bac76ecd1b27e75a95ca3a9a559c643b3afcd2dd62086d4b7a32a18b169/pydantic_core-2.41.5-cp314-cp314-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:2b761d210c9ea91feda40d25b4efe82a1707da2ef62901466a42492c028553a2", size = 2333302, upload-time = "2025-11-04T13:41:07.809Z" },
++    { url = "https://files.pythonhosted.org/packages/4c/d2/ef2074dc020dd6e109611a8be4449b98cd25e1b9b8a303c2f0fca2f2bcf7/pydantic_core-2.41.5-cp314-cp314-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:22f0fb8c1c583a3b6f24df2470833b40207e907b90c928cc8d3594b76f874375", size = 2064877, upload-time = "2025-11-04T13:41:09.827Z" },
++    { url = "https://files.pythonhosted.org/packages/18/66/e9db17a9a763d72f03de903883c057b2592c09509ccfe468187f2a2eef29/pydantic_core-2.41.5-cp314-cp314-manylinux_2_5_i686.manylinux1_i686.whl", hash = "sha256:2782c870e99878c634505236d81e5443092fba820f0373997ff75f90f68cd553", size = 2180680, upload-time = "2025-11-04T13:41:12.379Z" },
++    { url = "https://files.pythonhosted.org/packages/d3/9e/3ce66cebb929f3ced22be85d4c2399b8e85b622db77dad36b73c5387f8f8/pydantic_core-2.41.5-cp314-cp314-musllinux_1_1_aarch64.whl", hash = "sha256:0177272f88ab8312479336e1d777f6b124537d47f2123f89cb37e0accea97f90", size = 2138960, upload-time = "2025-11-04T13:41:14.627Z" },
++    { url = "https://files.pythonhosted.org/packages/a6/62/205a998f4327d2079326b01abee48e502ea739d174f0a89295c481a2272e/pydantic_core-2.41.5-cp314-cp314-musllinux_1_1_armv7l.whl", hash = "sha256:63510af5e38f8955b8ee5687740d6ebf7c2a0886d15a6d65c32814613681bc07", size = 2339102, upload-time = "2025-11-04T13:41:16.868Z" },
++    { url = "https://files.pythonhosted.org/packages/3c/0d/f05e79471e889d74d3d88f5bd20d0ed189ad94c2423d81ff8d0000aab4ff/pydantic_core-2.41.5-cp314-cp314-musllinux_1_1_x86_64.whl", hash = "sha256:e56ba91f47764cc14f1daacd723e3e82d1a89d783f0f5afe9c364b8bb491ccdb", size = 2326039, upload-time = "2025-11-04T13:41:18.934Z" },
++    { url = "https://files.pythonhosted.org/packages/ec/e1/e08a6208bb100da7e0c4b288eed624a703f4d129bde2da475721a80cab32/pydantic_core-2.41.5-cp314-cp314-win32.whl", hash = "sha256:aec5cf2fd867b4ff45b9959f8b20ea3993fc93e63c7363fe6851424c8a7e7c23", size = 1995126, upload-time = "2025-11-04T13:41:21.418Z" },
++    { url = "https://files.pythonhosted.org/packages/48/5d/56ba7b24e9557f99c9237e29f5c09913c81eeb2f3217e40e922353668092/pydantic_core-2.41.5-cp314-cp314-win_amd64.whl", hash = "sha256:8e7c86f27c585ef37c35e56a96363ab8de4e549a95512445b85c96d3e2f7c1bf", size = 2015489, upload-time = "2025-11-04T13:41:24.076Z" },
++    { url = "https://files.pythonhosted.org/packages/4e/bb/f7a190991ec9e3e0ba22e4993d8755bbc4a32925c0b5b42775c03e8148f9/pydantic_core-2.41.5-cp314-cp314-win_arm64.whl", hash = "sha256:e672ba74fbc2dc8eea59fb6d4aed6845e6905fc2a8afe93175d94a83ba2a01a0", size = 1977288, upload-time = "2025-11-04T13:41:26.33Z" },
++    { url = "https://files.pythonhosted.org/packages/92/ed/77542d0c51538e32e15afe7899d79efce4b81eee631d99850edc2f5e9349/pydantic_core-2.41.5-cp314-cp314t-macosx_10_12_x86_64.whl", hash = "sha256:8566def80554c3faa0e65ac30ab0932b9e3a5cd7f8323764303d468e5c37595a", size = 2120255, upload-time = "2025-11-04T13:41:28.569Z" },
++    { url = "https://files.pythonhosted.org/packages/bb/3d/6913dde84d5be21e284439676168b28d8bbba5600d838b9dca99de0fad71/pydantic_core-2.41.5-cp314-cp314t-macosx_11_0_arm64.whl", hash = "sha256:b80aa5095cd3109962a298ce14110ae16b8c1aece8b72f9dafe81cf597ad80b3", size = 1863760, upload-time = "2025-11-04T13:41:31.055Z" },
++    { url = "https://files.pythonhosted.org/packages/5a/f0/e5e6b99d4191da102f2b0eb9687aaa7f5bea5d9964071a84effc3e40f997/pydantic_core-2.41.5-cp314-cp314t-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:3006c3dd9ba34b0c094c544c6006cc79e87d8612999f1a5d43b769b89181f23c", size = 1878092, upload-time = "2025-11-04T13:41:33.21Z" },
++    { url = "https://files.pythonhosted.org/packages/71/48/36fb760642d568925953bcc8116455513d6e34c4beaa37544118c36aba6d/pydantic_core-2.41.5-cp314-cp314t-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:72f6c8b11857a856bcfa48c86f5368439f74453563f951e473514579d44aa612", size = 2053385, upload-time = "2025-11-04T13:41:35.508Z" },
++    { url = "https://files.pythonhosted.org/packages/20/25/92dc684dd8eb75a234bc1c764b4210cf2646479d54b47bf46061657292a8/pydantic_core-2.41.5-cp314-cp314t-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:5cb1b2f9742240e4bb26b652a5aeb840aa4b417c7748b6f8387927bc6e45e40d", size = 2218832, upload-time = "2025-11-04T13:41:37.732Z" },
++    { url = "https://files.pythonhosted.org/packages/e2/09/f53e0b05023d3e30357d82eb35835d0f6340ca344720a4599cd663dca599/pydantic_core-2.41.5-cp314-cp314t-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:bd3d54f38609ff308209bd43acea66061494157703364ae40c951f83ba99a1a9", size = 2327585, upload-time = "2025-11-04T13:41:40Z" },
++    { url = "https://files.pythonhosted.org/packages/aa/4e/2ae1aa85d6af35a39b236b1b1641de73f5a6ac4d5a7509f77b814885760c/pydantic_core-2.41.5-cp314-cp314t-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:2ff4321e56e879ee8d2a879501c8e469414d948f4aba74a2d4593184eb326660", size = 2041078, upload-time = "2025-11-04T13:41:42.323Z" },
++    { url = "https://files.pythonhosted.org/packages/cd/13/2e215f17f0ef326fc72afe94776edb77525142c693767fc347ed6288728d/pydantic_core-2.41.5-cp314-cp314t-manylinux_2_5_i686.manylinux1_i686.whl", hash = "sha256:d0d2568a8c11bf8225044aa94409e21da0cb09dcdafe9ecd10250b2baad531a9", size = 2173914, upload-time = "2025-11-04T13:41:45.221Z" },
++    { url = "https://files.pythonhosted.org/packages/02/7a/f999a6dcbcd0e5660bc348a3991c8915ce6599f4f2c6ac22f01d7a10816c/pydantic_core-2.41.5-cp314-cp314t-musllinux_1_1_aarch64.whl", hash = "sha256:a39455728aabd58ceabb03c90e12f71fd30fa69615760a075b9fec596456ccc3", size = 2129560, upload-time = "2025-11-04T13:41:47.474Z" },
++    { url = "https://files.pythonhosted.org/packages/3a/b1/6c990ac65e3b4c079a4fb9f5b05f5b013afa0f4ed6780a3dd236d2cbdc64/pydantic_core-2.41.5-cp314-cp314t-musllinux_1_1_armv7l.whl", hash = "sha256:239edca560d05757817c13dc17c50766136d21f7cd0fac50295499ae24f90fdf", size = 2329244, upload-time = "2025-11-04T13:41:49.992Z" },
++    { url = "https://files.pythonhosted.org/packages/d9/02/3c562f3a51afd4d88fff8dffb1771b30cfdfd79befd9883ee094f5b6c0d8/pydantic_core-2.41.5-cp314-cp314t-musllinux_1_1_x86_64.whl", hash = "sha256:2a5e06546e19f24c6a96a129142a75cee553cc018ffee48a460059b1185f4470", size = 2331955, upload-time = "2025-11-04T13:41:54.079Z" },
++    { url = "https://files.pythonhosted.org/packages/5c/96/5fb7d8c3c17bc8c62fdb031c47d77a1af698f1d7a406b0f79aaa1338f9ad/pydantic_core-2.41.5-cp314-cp314t-win32.whl", hash = "sha256:b4ececa40ac28afa90871c2cc2b9ffd2ff0bf749380fbdf57d165fd23da353aa", size = 1988906, upload-time = "2025-11-04T13:41:56.606Z" },
++    { url = "https://files.pythonhosted.org/packages/22/ed/182129d83032702912c2e2d8bbe33c036f342cc735737064668585dac28f/pydantic_core-2.41.5-cp314-cp314t-win_amd64.whl", hash = "sha256:80aa89cad80b32a912a65332f64a4450ed00966111b6615ca6816153d3585a8c", size = 1981607, upload-time = "2025-11-04T13:41:58.889Z" },
++    { url = "https://files.pythonhosted.org/packages/9f/ed/068e41660b832bb0b1aa5b58011dea2a3fe0ba7861ff38c4d4904c1c1a99/pydantic_core-2.41.5-cp314-cp314t-win_arm64.whl", hash = "sha256:35b44f37a3199f771c3eaa53051bc8a70cd7b54f333531c59e29fd4db5d15008", size = 1974769, upload-time = "2025-11-04T13:42:01.186Z" },
++]
++
++[[package]]
++name = "python-multipart"
++version = "0.0.22"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/94/01/979e98d542a70714b0cb2b6728ed0b7c46792b695e3eaec3e20711271ca3/python_multipart-0.0.22.tar.gz", hash = "sha256:7340bef99a7e0032613f56dc36027b959fd3b30a787ed62d310e951f7c3a3a58", size = 37612, upload-time = "2026-01-25T10:15:56.219Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/1b/d0/397f9626e711ff749a95d96b7af99b9c566a9bb5129b8e4c10fc4d100304/python_multipart-0.0.22-py3-none-any.whl", hash = "sha256:2b2cd894c83d21bf49d702499531c7bafd057d730c201782048f7945d82de155", size = 24579, upload-time = "2026-01-25T10:15:54.811Z" },
++]
++
++[[package]]
++name = "sqlalchemy"
++version = "2.0.46"
++source = { registry = "https://pypi.org/simple" }
++dependencies = [
++    { name = "greenlet", marker = "platform_machine == 'AMD64' or platform_machine == 'WIN32' or platform_machine == 'aarch64' or platform_machine == 'amd64' or platform_machine == 'ppc64le' or platform_machine == 'win32' or platform_machine == 'x86_64'" },
++    { name = "typing-extensions" },
++]
++sdist = { url = "https://files.pythonhosted.org/packages/06/aa/9ce0f3e7a9829ead5c8ce549392f33a12c4555a6c0609bb27d882e9c7ddf/sqlalchemy-2.0.46.tar.gz", hash = "sha256:cf36851ee7219c170bb0793dbc3da3e80c582e04a5437bc601bfe8c85c9216d7", size = 9865393, upload-time = "2026-01-21T18:03:45.119Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/e9/f8/5ecdfc73383ec496de038ed1614de9e740a82db9ad67e6e4514ebc0708a3/sqlalchemy-2.0.46-cp314-cp314-macosx_11_0_arm64.whl", hash = "sha256:56bdd261bfd0895452006d5316cbf35739c53b9bb71a170a331fa0ea560b2ada", size = 2152079, upload-time = "2026-01-21T19:05:58.477Z" },
++    { url = "https://files.pythonhosted.org/packages/e5/bf/eba3036be7663ce4d9c050bc3d63794dc29fbe01691f2bf5ccb64e048d20/sqlalchemy-2.0.46-cp314-cp314-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:33e462154edb9493f6c3ad2125931e273bbd0be8ae53f3ecd1c161ea9a1dd366", size = 3272216, upload-time = "2026-01-21T18:46:52.634Z" },
++    { url = "https://files.pythonhosted.org/packages/05/45/1256fb597bb83b58a01ddb600c59fe6fdf0e5afe333f0456ed75c0f8d7bd/sqlalchemy-2.0.46-cp314-cp314-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:9bcdce05f056622a632f1d44bb47dbdb677f58cad393612280406ce37530eb6d", size = 3277208, upload-time = "2026-01-21T18:40:16.38Z" },
++    { url = "https://files.pythonhosted.org/packages/d9/a0/2053b39e4e63b5d7ceb3372cface0859a067c1ddbd575ea7e9985716f771/sqlalchemy-2.0.46-cp314-cp314-musllinux_1_2_aarch64.whl", hash = "sha256:8e84b09a9b0f19accedcbeff5c2caf36e0dd537341a33aad8d680336152dc34e", size = 3221994, upload-time = "2026-01-21T18:46:54.622Z" },
++    { url = "https://files.pythonhosted.org/packages/1e/87/97713497d9502553c68f105a1cb62786ba1ee91dea3852ae4067ed956a50/sqlalchemy-2.0.46-cp314-cp314-musllinux_1_2_x86_64.whl", hash = "sha256:4f52f7291a92381e9b4de9050b0a65ce5d6a763333406861e33906b8aa4906bf", size = 3243990, upload-time = "2026-01-21T18:40:18.253Z" },
++    { url = "https://files.pythonhosted.org/packages/a8/87/5d1b23548f420ff823c236f8bea36b1a997250fd2f892e44a3838ca424f4/sqlalchemy-2.0.46-cp314-cp314-win32.whl", hash = "sha256:70ed2830b169a9960193f4d4322d22be5c0925357d82cbf485b3369893350908", size = 2114215, upload-time = "2026-01-21T18:42:55.232Z" },
++    { url = "https://files.pythonhosted.org/packages/3a/20/555f39cbcf0c10cf452988b6a93c2a12495035f68b3dbd1a408531049d31/sqlalchemy-2.0.46-cp314-cp314-win_amd64.whl", hash = "sha256:3c32e993bc57be6d177f7d5d31edb93f30726d798ad86ff9066d75d9bf2e0b6b", size = 2139867, upload-time = "2026-01-21T18:42:56.474Z" },
++    { url = "https://files.pythonhosted.org/packages/3e/f0/f96c8057c982d9d8a7a68f45d69c674bc6f78cad401099692fe16521640a/sqlalchemy-2.0.46-cp314-cp314t-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:4dafb537740eef640c4d6a7c254611dca2df87eaf6d14d6a5fca9d1f4c3fc0fa", size = 3561202, upload-time = "2026-01-21T18:33:10.337Z" },
++    { url = "https://files.pythonhosted.org/packages/d7/53/3b37dda0a5b137f21ef608d8dfc77b08477bab0fe2ac9d3e0a66eaeab6fc/sqlalchemy-2.0.46-cp314-cp314t-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:42a1643dc5427b69aca967dae540a90b0fbf57eaf248f13a90ea5930e0966863", size = 3526296, upload-time = "2026-01-21T18:45:12.657Z" },
++    { url = "https://files.pythonhosted.org/packages/33/75/f28622ba6dde79cd545055ea7bd4062dc934e0621f7b3be2891f8563f8de/sqlalchemy-2.0.46-cp314-cp314t-musllinux_1_2_aarch64.whl", hash = "sha256:ff33c6e6ad006bbc0f34f5faf941cfc62c45841c64c0a058ac38c799f15b5ede", size = 3470008, upload-time = "2026-01-21T18:33:11.725Z" },
++    { url = "https://files.pythonhosted.org/packages/a9/42/4afecbbc38d5e99b18acef446453c76eec6fbd03db0a457a12a056836e22/sqlalchemy-2.0.46-cp314-cp314t-musllinux_1_2_x86_64.whl", hash = "sha256:82ec52100ec1e6ec671563bbd02d7c7c8d0b9e71a0723c72f22ecf52d1755330", size = 3476137, upload-time = "2026-01-21T18:45:15.001Z" },
++    { url = "https://files.pythonhosted.org/packages/fc/a1/9c4efa03300926601c19c18582531b45aededfb961ab3c3585f1e24f120b/sqlalchemy-2.0.46-py3-none-any.whl", hash = "sha256:f9c11766e7e7c0a2767dda5acb006a118640c9fc0a4104214b96269bfb78399e", size = 1937882, upload-time = "2026-01-21T18:22:10.456Z" },
++]
++
++[[package]]
++name = "starlette"
++version = "0.52.1"
++source = { registry = "https://pypi.org/simple" }
++dependencies = [
++    { name = "anyio" },
++]
++sdist = { url = "https://files.pythonhosted.org/packages/c4/68/79977123bb7be889ad680d79a40f339082c1978b5cfcf62c2d8d196873ac/starlette-0.52.1.tar.gz", hash = "sha256:834edd1b0a23167694292e94f597773bc3f89f362be6effee198165a35d62933", size = 2653702, upload-time = "2026-01-18T13:34:11.062Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/81/0d/13d1d239a25cbfb19e740db83143e95c772a1fe10202dda4b76792b114dd/starlette-0.52.1-py3-none-any.whl", hash = "sha256:0029d43eb3d273bc4f83a08720b4912ea4b071087a3b48db01b7c839f7954d74", size = 74272, upload-time = "2026-01-18T13:34:09.188Z" },
++]
++
++[[package]]
++name = "typing-extensions"
++version = "4.15.0"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/72/94/1a15dd82efb362ac84269196e94cf00f187f7ed21c242792a923cdb1c61f/typing_extensions-4.15.0.tar.gz", hash = "sha256:0cea48d173cc12fa28ecabc3b837ea3cf6f38c6d1136f85cbaaf598984861466", size = 109391, upload-time = "2025-08-25T13:49:26.313Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/18/67/36e9267722cc04a6b9f15c7f3441c2363321a3ea07da7ae0c0707beb2a9c/typing_extensions-4.15.0-py3-none-any.whl", hash = "sha256:f0fa19c6845758ab08074a0cfa8b7aecb71c999ca73d62883bc25cc018c4e548", size = 44614, upload-time = "2025-08-25T13:49:24.86Z" },
++]
++
++[[package]]
++name = "typing-inspection"
++version = "0.4.2"
++source = { registry = "https://pypi.org/simple" }
++dependencies = [
++    { name = "typing-extensions" },
++]
++sdist = { url = "https://files.pythonhosted.org/packages/55/e3/70399cb7dd41c10ac53367ae42139cf4b1ca5f36bb3dc6c9d33acdb43655/typing_inspection-0.4.2.tar.gz", hash = "sha256:ba561c48a67c5958007083d386c3295464928b01faa735ab8547c5692e87f464", size = 75949, upload-time = "2025-10-01T02:14:41.687Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/dc/9b/47798a6c91d8bdb567fe2698fe81e0c6b7cb7ef4d13da4114b41d239f65d/typing_inspection-0.4.2-py3-none-any.whl", hash = "sha256:4ed1cacbdc298c220f1bd249ed5287caa16f34d44ef4e9c3d0cbad5b521545e7", size = 14611, upload-time = "2025-10-01T02:14:40.154Z" },
++]
++
++[[package]]
++name = "uvicorn"
++version = "0.40.0"
++source = { registry = "https://pypi.org/simple" }
++dependencies = [
++    { name = "click" },
++    { name = "h11" },
++]
++sdist = { url = "https://files.pythonhosted.org/packages/c3/d1/8f3c683c9561a4e6689dd3b1d345c815f10f86acd044ee1fb9a4dcd0b8c5/uvicorn-0.40.0.tar.gz", hash = "sha256:839676675e87e73694518b5574fd0f24c9d97b46bea16df7b8c05ea1a51071ea", size = 81761, upload-time = "2025-12-21T14:16:22.45Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/3d/d8/2083a1daa7439a66f3a48589a57d576aa117726762618f6bb09fe3798796/uvicorn-0.40.0-py3-none-any.whl", hash = "sha256:c6c8f55bc8bf13eb6fa9ff87ad62308bbbc33d0b67f84293151efe87e0d5f2ee", size = 68502, upload-time = "2025-12-21T14:16:21.041Z" },
++]
+Index: alembic.ini
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/alembic.ini b/alembic.ini
+new file mode 100644
+--- /dev/null	(date 1770855430626)
++++ b/alembic.ini	(date 1770855430626)
+@@ -0,0 +1,148 @@
++# A generic, single database configuration.
++
++[alembic]
++# path to migration scripts.
++# this is typically a path given in POSIX (e.g. forward slashes)
++# format, relative to the token %(here)s which refers to the location of this
++# ini file
++script_location = %(here)s/alembic
++
++# template used to generate migration file names; The default value is %%(rev)s_%%(slug)s
++# Uncomment the line below if you want the files to be prepended with date and time
++# see https://alembic.sqlalchemy.org/en/latest/tutorial.html#editing-the-ini-file
++# for all available tokens
++# file_template = %%(year)d_%%(month).2d_%%(day).2d_%%(hour).2d%%(minute).2d-%%(rev)s_%%(slug)s
++
++# sys.path path, will be prepended to sys.path if present.
++# defaults to the current working directory.  for multiple paths, the path separator
++# is defined by "path_separator" below.
++prepend_sys_path = .
++
++
++# timezone to use when rendering the date within the migration file
++# as well as the filename.
++# If specified, requires the tzdata library which can be installed by adding
++# `alembic[tz]` to the pip requirements.
++# string value is passed to ZoneInfo()
++# leave blank for localtime
++# timezone =
++
++# max length of characters to apply to the "slug" field
++# truncate_slug_length = 40
++
++# set to 'true' to run the environment during
++# the 'revision' command, regardless of autogenerate
++# revision_environment = false
++
++# set to 'true' to allow .pyc and .pyo files without
++# a source .py file to be detected as revisions in the
++# versions/ directory
++# sourceless = false
++
++# version location specification; This defaults
++# to <script_location>/versions.  When using multiple version
++# directories, initial revisions must be specified with --version-path.
++# The path separator used here should be the separator specified by "path_separator"
++# below.
++# version_locations = %(here)s/bar:%(here)s/bat:%(here)s/alembic/versions
++
++# path_separator; This indicates what character is used to split lists of file
++# paths, including version_locations and prepend_sys_path within configparser
++# files such as alembic.ini.
++# The default rendered in new alembic.ini files is "os", which uses os.pathsep
++# to provide os-dependent path splitting.
++#
++# Note that in order to support legacy alembic.ini files, this default does NOT
++# take place if path_separator is not present in alembic.ini.  If this
++# option is omitted entirely, fallback logic is as follows:
++#
++# 1. Parsing of the version_locations option falls back to using the legacy
++#    "version_path_separator" key, which if absent then falls back to the legacy
++#    behavior of splitting on spaces and/or commas.
++# 2. Parsing of the prepend_sys_path option falls back to the legacy
++#    behavior of splitting on spaces, commas, or colons.
++#
++# Valid values for path_separator are:
++#
++# path_separator = :
++# path_separator = ;
++# path_separator = space
++# path_separator = newline
++#
++# Use os.pathsep. Default configuration used for new projects.
++path_separator = os
++
++# set to 'true' to search source files recursively
++# in each "version_locations" directory
++# new in Alembic version 1.10
++# recursive_version_locations = false
++
++# the output encoding used when revision files
++# are written from script.py.mako
++# output_encoding = utf-8
++
++# database URL.  This is consumed by the user-maintained env.py script only.
++# other means of configuring database URLs may be customized within the env.py
++# file.
++sqlalchemy.url = postgresql://postgres.uzifservuiydydcqpzfp:postgres2026@aws-1-eu-west-2.pooler.supabase.com:5432/postgres
++
++
++
++[post_write_hooks]
++# post_write_hooks defines scripts or Python functions that are run
++# on newly generated revision scripts.  See the documentation for further
++# detail and examples
++
++# format using "black" - use the console_scripts runner, against the "black" entrypoint
++# hooks = black
++# black.type = console_scripts
++# black.entrypoint = black
++# black.options = -l 79 REVISION_SCRIPT_FILENAME
++
++# lint with attempts to fix using "ruff" - use the module runner, against the "ruff" module
++# hooks = ruff
++# ruff.type = module
++# ruff.module = ruff
++# ruff.options = check --fix REVISION_SCRIPT_FILENAME
++
++# Alternatively, use the exec runner to execute a binary found on your PATH
++# hooks = ruff
++# ruff.type = exec
++# ruff.executable = ruff
++# ruff.options = check --fix REVISION_SCRIPT_FILENAME
++
++# Logging configuration.  This is also consumed by the user-maintained
++# env.py script only.
++[loggers]
++keys = root,sqlalchemy,alembic
++
++[handlers]
++keys = console
++
++[formatters]
++keys = generic
++
++[logger_root]
++level = WARNING
++handlers = console
++qualname =
++
++[logger_sqlalchemy]
++level = WARNING
++handlers =
++qualname = sqlalchemy.engine
++
++[logger_alembic]
++level = INFO
++handlers =
++qualname = alembic
++
++[handler_console]
++class = StreamHandler
++args = (sys.stderr,)
++level = NOTSET
++formatter = generic
++
++[formatter_generic]
++format = %(levelname)-5.5s [%(name)s] %(message)s
++datefmt = %H:%M:%S
+Index: pyproject.toml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/pyproject.toml b/pyproject.toml
+new file mode 100644
+--- /dev/null	(date 1770854296523)
++++ b/pyproject.toml	(date 1770854296523)
+@@ -0,0 +1,15 @@
++[project]
++name = "aichatbot"
++version = "0.1.0"
++description = "Add your description here"
++readme = "README.md"
++requires-python = ">=3.14"
++dependencies = [
++    "aiofiles>=25.1.0",
++    "fastapi>=0.128.8",
++    "jinja2>=3.1.6",
++    "pydantic[email]>=2.12.5",
++    "python-multipart>=0.0.22",
++    "sqlalchemy>=2.0.46",
++    "uvicorn>=0.40.0",
++]
+Index: .python-version
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/.python-version b/.python-version
+new file mode 100644
+--- /dev/null	(date 1770852960680)
++++ b/.python-version	(date 1770852960680)
+@@ -0,0 +1,1 @@
++3.14
+Index: templates/index.html
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/templates/index.html b/templates/index.html
+--- a/templates/index.html
++++ b/templates/index.html	(date 1770854470469)
+@@ -9,7 +9,7 @@
+     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
++    <link rel="stylesheet" href="{{ url_for('static', path='css/style.css') }}">
+     <style>
+         /* Fix for mobile browsers where address bar covers the bottom */
+         .chat-wrapper {
+@@ -48,18 +48,6 @@
+             </div>
+         </header>
+         <!-- Flash Messages Area -->
+-{% with messages = get_flashed_messages(with_categories=true) %}
+-    {% if messages %}
+-        <div class="position-absolute top-0 start-50 translate-middle-x mt-4" style="z-index: 2000; width: 90%; max-width: 600px;">
+-            {% for category, message in messages %}
+-                <div class="alert alert-{{ category }} alert-dismissible fade show glass-alert shadow-lg" role="alert">
+-                    {{ message }}
+-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+-                </div>
+-            {% endfor %}
+-        </div>
+-    {% endif %}
+-{% endwith %}
+ 
+         <!-- Messages Area -->
+         <main class="chat-messages-glass" id="chatMessages">
+@@ -113,6 +101,6 @@
+     </div>
+ 
+     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+-    <script src="{{ url_for('static', filename='js/chat.js') }}"></script>
++    <script src="{{ url_for('static', path='js/chat.js') }}"></script>
+ </body>
+ </html>
+Index: templates/login.html
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/templates/login.html b/templates/login.html
+--- a/templates/login.html
++++ b/templates/login.html	(date 1770854470179)
+@@ -7,7 +7,7 @@
+     <!-- Bootstrap CSS -->
+     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" 
+           integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
+-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
++    <link rel="stylesheet" href="{{ url_for('static', path='css/style.css') }}">
+ </head>
+ <body class="auth-body">
+     <div class="container d-flex justify-content-center align-items-center min-vh-100">
+@@ -16,18 +16,14 @@
+                 <h1 class="card-title text-center mb-4 text-white">Login</h1>
+                 <p class="text-white-50 text-center mb-4">Sign in to continue to your account</p>
+ 
+-                {% with messages = get_flashed_messages(with_categories=true) %}
+-                    {% if messages %}
+-                        <div class="mb-4">
+-                            {% for category, message in messages %}
+-                                <div class="alert alert-{{ 'danger' if category == 'error' else 'success' if category == 'success' else 'info' }} alert-dismissible fade show glass-alert" role="alert">
+-                                    {{ message }}
+-                                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+-                                </div>
+-                            {% endfor %}
+-                        </div>
+-                    {% endif %}
+-                {% endwith %}
++                {% if error %}
++                    <div class="mb-4">
++                        <div class="alert alert-danger alert-dismissible fade show glass-alert" role="alert">
++                            {{ error }}
++                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
++                        </div>
++                    </div>
++                {% endif %}
+ 
+                 <form method="POST" action="{{ url_for('login') }}">
+                     <div class="mb-4">
+Index: templates/signup.html
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/templates/signup.html b/templates/signup.html
+--- a/templates/signup.html
++++ b/templates/signup.html	(date 1770854470358)
+@@ -7,7 +7,7 @@
+     <!-- Bootstrap CSS -->
+     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" 
+           integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
+-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
++    <link rel="stylesheet" href="{{ url_for('static', path='css/style.css') }}">
+ </head>
+ <body class="auth-body">
+     <div class="container d-flex justify-content-center align-items-center min-vh-100">
+@@ -16,18 +16,14 @@
+                 <h1 class="card-title text-center mb-4 text-white">Sign Up</h1>
+                 <p class="text-white-50 text-center mb-4">Create a new account to get started</p>
+ 
+-                {% with messages = get_flashed_messages(with_categories=true) %}
+-                    {% if messages %}
+-                        <div class="mb-4">
+-                            {% for category, message in messages %}
+-                                <div class="alert alert-{{ 'danger' if category == 'error' else 'success' if category == 'success' else 'info' }} alert-dismissible fade show glass-alert" role="alert">
+-                                    {{ message }}
+-                                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+-                                </div>
+-                            {% endfor %}
+-                        </div>
+-                    {% endif %}
+-                {% endwith %}
++                {% if error %}
++                    <div class="mb-4">
++                        <div class="alert alert-danger alert-dismissible fade show glass-alert" role="alert">
++                            {{ error }}
++                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
++                        </div>
++                    </div>
++                {% endif %}
+ 
+                 <form method="POST" action="{{ url_for('signup') }}">
+                     <div class="mb-4">
+Index: templates/products.html
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/templates/products.html b/templates/products.html
+--- a/templates/products.html
++++ b/templates/products.html	(date 1770854482307)
+@@ -9,7 +9,7 @@
+     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" crossorigin="anonymous">
+     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
++    <link rel="stylesheet" href="{{ url_for('static', path='css/style.css') }}">
+ </head>
+ <body class="marketplace-body">
+     <!-- Navbar -->
+@@ -93,16 +93,6 @@
+                 </div>
+ 
+                 <!-- Flash Messages -->
+-                {% with messages = get_flashed_messages(with_categories=true) %}
+-                    {% if messages %}
+-                        {% for category, message in messages %}
+-                            <div class="alert alert-{{ category }} alert-dismissible fade show mb-4" role="alert">
+-                                {{ message }}
+-                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+-                            </div>
+-                        {% endfor %}
+-                    {% endif %}
+-                {% endwith %}
+ 
+                 <!-- Products Grid -->
+                 {% if products %}
+Index: templates/settings.html
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/templates/settings.html b/templates/settings.html
+--- a/templates/settings.html
++++ b/templates/settings.html	(date 1770854482476)
+@@ -162,15 +162,16 @@
+             <a href="{{ url_for('logout') }}">Logout</a>
+         </div>
+ 
+-        {% with messages = get_flashed_messages(with_categories=true) %}
+-            {% if messages %}
+-                <div class="flash-messages">
+-                    {% for category, message in messages %}
+-                        <div class="flash {{ category }}">{{ message }}</div>
+-                    {% endfor %}
+-                </div>
+-            {% endif %}
+-        {% endwith %}
++        {% if error %}
++            <div class="flash-messages">
++                <div class="flash error">{{ error }}</div>
++            </div>
++        {% endif %}
++        {% if success %}
++            <div class="flash-messages">
++                <div class="flash success">{{ success }}</div>
++            </div>
++        {% endif %}
+ 
+         <form method="POST">
+             <div class="form-group">
+Index: whatsapp_bot/app/utils/whatsapp_utils.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/whatsapp_bot/app/utils/whatsapp_utils.py b/whatsapp_bot/app/utils/whatsapp_utils.py
+--- a/whatsapp_bot/app/utils/whatsapp_utils.py
++++ b/whatsapp_bot/app/utils/whatsapp_utils.py	(date 1770858167378)
+@@ -30,13 +30,16 @@
+     return response.upper()
+ 
+ 
+-def send_message(data):
++def send_message(data, phone_number_id=None):
+     headers = {
+         "Content-type": "application/json",
+         "Authorization": f"Bearer {current_app.config['ACCESS_TOKEN']}",
+     }
+ 
+-    url = f"https://graph.facebook.com/{current_app.config['VERSION']}/{current_app.config['PHONE_NUMBER_ID']}/messages"
++    if phone_number_id is None:
++        phone_number_id = current_app.config['PHONE_NUMBER_ID']
++
++    url = f"https://graph.facebook.com/{current_app.config['VERSION']}/{phone_number_id}/messages"
+ 
+     try:
+         response = requests.post(
+@@ -79,12 +82,17 @@
+     """
+     Process incoming WhatsApp message and link it to the correct business.
+     """
+-    from ai.models import db  # Import here to avoid circular imports
++    from ai.models import session  # Import here to avoid circular imports
+ 
+     wa_id = body["entry"][0]["changes"][0]["value"]["contacts"][0]["wa_id"]
+     name = body["entry"][0]["changes"][0]["value"]["contacts"][0]["profile"]["name"]
+ 
+     message = body["entry"][0]["changes"][0]["value"]["messages"][0]
++
++    if message.get("type") != "text":
++        logging.info("Received non-text message, skipping.")
++        return
++
+     message_body = message["text"]["body"]
+ 
+     # ✅ Get the PHONE_NUMBER_ID from the webhook payload
+@@ -98,7 +106,7 @@
+         # Send error message back to user
+         error_response = "Sorry, this WhatsApp number is not configured for any business."
+         data = get_text_message_input(wa_id, error_response)
+-        send_message(data)
++        send_message(data, phone_number_id)
+         return
+ 
+     logging.info(f"Processing message for business: {business.name} (ID: {business.id})")
+@@ -124,7 +132,7 @@
+ 
+     # Send response back to user
+     data = get_text_message_input(wa_id, response)
+-    send_message(data)
++    send_message(data, phone_number_id)
+ 
+ 
+ def is_valid_whatsapp_message(body):
+diff --git a/README.md b/README.md
+new file mode 100644

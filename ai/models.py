@@ -75,4 +75,7 @@ class Business(db.Model):
     # Changed to BigInteger to support large phone number IDs
     phone_number_id = db.Column(db.BigInteger, unique=True, nullable=True)
 
+    # ✅ Business persona: defines the AI's personality/instructions
+    persona = db.Column(db.Text, nullable=True)
+
     created_at = db.Column(db.DateTime, default=datetime.now)
