@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block title %}Sign Up - AI Chatbot{% endblock %}
+
+{% block body_class %}auth-body{% endblock %}
+
+{% block content %}
+    <div class="container d-flex justify-content-center align-items-center min-vh-100">
+        <div class="glass-card">
+            <div class="card-body p-5">
+                <h1 class="card-title text-center mb-4 text-white">Create Account</h1>
+                <p class="text-white-50 text-center mb-4">Join us to start your journey</p>
+
+                {% if error %}
+                <div class="alert alert-danger glass-alert alert-dismissible fade show" role="alert">
+                    {{ error }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+                {% endif %}
+
+                <form method="POST" action="{{ url_for('signup_post') }}">
+                    <div class="mb-3">
+                        <div class="input-field">
+                            <input type="text" class="form-control glass-input" id="username" name="username" required autofocus>
+                            <label for="username" class="glass-label">Username</label>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="input-field">
+                            <input type="email" class="form-control glass-input" id="email" name="email">
+                            <label for="email" class="glass-label">Email (Optional)</label>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="input-field">
+                            <input type="text" class="form-control glass-input" id="business_name" name="business_name" required>
+                            <label for="business_name" class="glass-label">Business Name</label>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <div class="input-field">
+                            <input type="password" class="form-control glass-input" id="password" name="password" required>
+                            <label for="password" class="glass-label">Password</label>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn glass-btn w-100 mb-3">Sign Up</button>
+                </form>
+
+                <div class="text-center pt-3 border-top border-white border-opacity-25">
+                    <p class="mb-0 text-white-50">Already have an account? <a href="{{ url_for('login') }}" class="text-white text-decoration-none fw-bold">Login</a></p>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

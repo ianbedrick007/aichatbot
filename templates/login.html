@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block title %}Login - AI Chatbot{% endblock %}
+
+{% block body_class %}auth-body{% endblock %}
+
+{% block content %}
+<div class="container d-flex justify-content-center align-items-center min-vh-100">
+    <div class="glass-card">
+        <div class="card-body p-5">
+            <h1 class="card-title text-center mb-4 text-white">Login</h1>
+            <p class="text-white-50 text-center mb-4">Sign in to continue to your account</p>
+
+            {% if error %}
+<div class="alert alert-danger glass-alert alert-dismissible fade show" role="alert">
+    {{ error }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+</div>
+{% endif %}
+
+{% if messages %}
+    {% for message in messages %}
+    <div class="alert alert-{{ 'danger' if category == 'error' else 'success' if category == 'success' else 'info' }} alert-dismissible fade show glass-alert" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    {% endfor %}
+{% endif %}
+
+
+
+        <form method="POST" action="{{ url_for('login') }}">
+            <div class="mb-4">
+                <div class="input-field">
+                    <input type="text" class="form-control glass-input" id="username" name="username" required
+                           autofocus>
+                    <label for="username" class="glass-label">Username</label>
+                </div>
+            </div>
+
+            <div class="mb-4">
+                <div class="input-field">
+                    <input type="password" class="form-control glass-input" id="password" name="password" required>
+                    <label for="password" class="glass-label">Password</label>
+                </div>
+            </div>
+
+            <button type="submit" class="btn glass-btn w-100 mb-3">Sign In</button>
+        </form>
+
+        <div class="text-center pt-3 border-top border-white border-opacity-25">
+            <p class="mb-0 text-white-50">Don't have an account? <a href="{{ url_for('signup') }}"
+                                                                    class="text-white text-decoration-none fw-bold">Sign
+                up</a></p>
+        </div>
+    </div>
+</div>
+</div>
+{% endblock %}

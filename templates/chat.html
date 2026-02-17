@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block title %}Chat - AI Chatbot{% endblock %}
+
+{% block body_class %}chat-body{% endblock %}
+
+{% block content %}
+<div class="chat-wrapper">
+    <!-- Glass Header -->
+    <header class="chat-header-glass">
+        <div class="header-left">
+            <div class="avatar-circle">
+                <span class="avatar-initial">{{ user.username[0].upper() if user else 'G' }}</span>
+            </div>
+            <div class="header-info">
+                <h1 class="header-title">{{ business.persona if business and business.persona else 'AI Assistant' }}
+                </h1>
+                <div class="status-indicator">
+                    <span class="status-dot"></span>
+                    <span class="status-text">Online</span>
+                </div>
+            </div>
+        </div>
+        <div class="header-right">
+            <a href="{{ url_for('conversations') }}" class="icon-btn" title="Conversations">
+                <i class="bi bi-chat-dots"></i>
+            </a>
+            <a href="{{ url_for('products') }}" class="icon-btn" title="Marketplace">
+                <i class="bi bi-shop"></i>
+            </a>
+            <a href="{{ url_for('settings') }}" class="icon-btn" title="Settings">
+                <i class="bi bi-gear"></i>
+            </a>
+            <form action="{{ url_for('logout') }}" method="get" class="inline-form">
+                <button type="submit" class="icon-btn" title="Logout">
+                    <i class="bi bi-box-arrow-right"></i>
+                </button>
+            </form>
+        </div>
+    </header>
+
+    <!-- Chat Messages Area -->
+    <div class="chat-messages-glass" id="chatMessages">
+        {% if not messages %}
+        <div class="empty-state-glass">
+            <i class="bi bi-chat-square-text" style="font-size: 48px; opacity: 0.5;"></i>
+            <p class="empty-text">Start a conversation with your AI assistant</p>
+        </div>
+        {% else %}
+        {% for message in messages %}
+        <div class="message-item {{ 'message-user' if message.role == 'user' else 'message-bot' }}">
+            <div class="message-bubble-glass">
+                <p class="message-text">{{ message.content }}</p>
+                <span class="message-time">{{ message.timestamp }}</span>
+            </div>
+        </div>
+        {% endfor %}
+        {% endif %}
+
+        <!-- Thinking Bubble (Hidden by default) -->
+        <div class="message-item message-bot thinking-bubble" id="thinkingBubble" style="display: none;">
+            <div class="message-bubble-glass">
+                <div class="thinking-dots">
+                    <div class="thinking-dot"></div>
+                    <div class="thinking-dot"></div>
+                    <div class="thinking-dot"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Input Area -->
+    <div class="chat-input-glass">
+        <form id="chatForm" class="input-form">
+            <div class="input-container-glass">
+                <input type="text" id="messageInput" class="message-input-glass" placeholder="Type your message..."
+                    autocomplete="off">
+                <button type="submit" class="send-btn-glass" id="sendButton" disabled>
+                    <i class="bi bi-send-fill"></i>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', path='js/chat.js') }}"></script>
+{% endblock %}

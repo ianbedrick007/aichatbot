@@ -1,0 +1,529 @@
+/* WhatsApp Web-Style Conversations Page */
+
+/* Body class for conversations page */
+.conversations-body {
+    margin: 0;
+    padding: 0;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+    background: #111b21;
+    color: #e9edef;
+    overflow: hidden;
+}
+
+/* Main Container - Full viewport height */
+.conversations-wrapper {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    width: 100%;
+    max-width: 1600px;
+    margin: 0 auto;
+    background: #111b21;
+}
+
+/* Header - Fixed at top */
+.chat-header-glass {
+    background: rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 72px;
+    flex-shrink: 0;
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.avatar-circle {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.3), rgba(118, 75, 162, 0.3));
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.avatar-initial {
+    color: #fff;
+    font-weight: 600;
+    font-size: 20px;
+}
+
+.header-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.header-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: #fff;
+    margin: 0;
+    letter-spacing: -0.3px;
+}
+
+.status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #4ade80;
+    box-shadow: 0 0 8px rgba(74, 222, 128, 0.5);
+}
+
+.status-text {
+    font-weight: 400;
+}
+
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.inline-form {
+    margin: 0;
+    padding: 0;
+    display: inline;
+}
+
+.icon-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.1);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-decoration: none;
+}
+
+.icon-btn:hover {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.25);
+    transform: translateY(-1px);
+}
+
+/* Two-Column Layout - WhatsApp Web Style */
+.conversations-content {
+    display: flex !important;
+    flex: 1 !important;
+    overflow: hidden !important;
+    background: #222e35 !important;
+}
+
+/* Left Sidebar - Contacts List (30%) */
+.conversations-sidebar {
+    flex: 0 0 30% !important;
+    min-width: 300px !important;
+    max-width: 500px !important;
+    background: #111b21 !important;
+    border-right: 1px solid #2a3942 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+}
+
+.sidebar-header {
+    padding: 16px 20px !important;
+    background: #202c33 !important;
+    border-bottom: 1px solid #2a3942 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    flex-shrink: 0 !important;
+}
+
+.sidebar-title {
+    font-size: 16px !important;
+    font-weight: 600 !important;
+    color: #e9edef !important;
+    margin: 0 !important;
+}
+
+.customer-count {
+    background: #00a884 !important;
+    color: #fff !important;
+    padding: 2px 8px !important;
+    border-radius: 12px !important;
+    font-size: 12px !important;
+    font-weight: 600 !important;
+}
+
+/* Customer List - Scrollable */
+.customer-list {
+    flex: 1 !important;
+    overflow-y: auto !important;
+    background: #111b21 !important;
+}
+
+.customer-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.customer-list::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.customer-list::-webkit-scrollbar-thumb {
+    background: #374045;
+    border-radius: 3px;
+}
+
+.customer-list::-webkit-scrollbar-thumb:hover {
+    background: #4a5459;
+}
+
+/* Customer Item - WhatsApp Style */
+.customer-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border-bottom: 1px solid #2a3942;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.customer-item:hover {
+    background: #202c33;
+}
+
+.customer-item.active {
+    background: #2a3942;
+}
+
+.customer-avatar-small {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: #00a884;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.customer-avatar-small span {
+    color: #fff;
+    font-weight: 600;
+    font-size: 20px;
+}
+
+.customer-preview {
+    flex: 1;
+    min-width: 0;
+    position: relative;
+}
+
+.customer-preview-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 4px;
+}
+
+.customer-preview-name {
+    font-size: 16px;
+    font-weight: 500;
+    color: #e9edef;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.customer-preview-time {
+    font-size: 12px;
+    color: #8696a0;
+    flex-shrink: 0;
+    margin-left: 8px;
+}
+
+.customer-preview-message {
+    font-size: 14px;
+    color: #8696a0;
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.4;
+}
+
+.message-count-badge {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    background: #00a884;
+    color: #111b21;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 10px;
+    min-width: 20px;
+    text-align: center;
+}
+
+/* Right Panel - Conversation Detail (70%) */
+.conversation-detail {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: #0b141a;
+    position: relative;
+}
+
+/* Empty State */
+.empty-state-glass {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    color: #8696a0;
+}
+
+.empty-icon {
+    font-size: 64px;
+    opacity: 0.3;
+}
+
+.empty-text {
+    font-size: 16px;
+    color: #8696a0;
+    margin: 0;
+}
+
+/* Conversation Header */
+.conversation-header {
+    padding: 16px 20px;
+    background: #202c33;
+    border-bottom: 1px solid #2a3942;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+}
+
+.customer-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.customer-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #00a884;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.customer-avatar span {
+    color: #fff;
+    font-weight: 600;
+    font-size: 18px;
+}
+
+.customer-name {
+    font-size: 16px;
+    font-weight: 500;
+    color: #e9edef;
+    margin: 0 0 2px 0;
+}
+
+.customer-status {
+    font-size: 13px;
+    color: #8696a0;
+    margin: 0;
+}
+
+/* Conversation Messages - WhatsApp Chat Background */
+.conversation-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 8%;
+    background: #0b141a;
+    background-image:
+        repeating-linear-gradient(45deg,
+            transparent,
+            transparent 10px,
+            rgba(255, 255, 255, 0.01) 10px,
+            rgba(255, 255, 255, 0.01) 20px);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.conversation-messages::-webkit-scrollbar {
+    width: 6px;
+}
+
+.conversation-messages::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.conversation-messages::-webkit-scrollbar-thumb {
+    background: #374045;
+    border-radius: 3px;
+}
+
+/* Message Bubbles - WhatsApp Style */
+.message-item {
+    display: flex;
+    animation: slideIn 0.2s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.message-user {
+    justify-content: flex-end;
+}
+
+.message-bot {
+    justify-content: flex-start;
+}
+
+.message-bubble-glass {
+    max-width: 65%;
+    padding: 8px 12px;
+    border-radius: 8px;
+    word-wrap: break-word;
+    position: relative;
+    box-shadow: 0 1px 0.5px rgba(0, 0, 0, 0.13);
+}
+
+/* Customer Messages (Left - White) */
+.message-bot .message-bubble-glass {
+    background: #202c33;
+    color: #e9edef;
+    border-radius: 0 8px 8px 8px;
+}
+
+/* Bot Messages (Right - Green) */
+.message-user .message-bubble-glass {
+    background: #005c4b;
+    color: #e9edef;
+    border-radius: 8px 0 8px 8px;
+}
+
+.message-text {
+    color: inherit;
+    font-size: 14px;
+    line-height: 1.5;
+    margin: 0 0 4px 0;
+    word-wrap: break-word;
+}
+
+.message-time {
+    font-size: 11px;
+    color: rgba(233, 237, 239, 0.6);
+    display: block;
+    text-align: right;
+    margin-top: 4px;
+}
+
+/* Loading/Error States */
+.loading-state,
+.error-state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    color: #8696a0;
+    padding: 40px;
+}
+
+.loading-state i,
+.error-state i {
+    font-size: 32px;
+    opacity: 0.5;
+}
+
+.loading-state p,
+.error-state p {
+    font-size: 14px;
+    color: #8696a0;
+    margin: 0;
+}
+
+/* Utility Classes */
+.hidden {
+    display: none !important;
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+    .conversations-sidebar {
+        flex: 0 0 35%;
+    }
+}
+
+@media (max-width: 768px) {
+    .conversations-content {
+        position: relative;
+    }
+
+    .conversations-sidebar {
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 100%;
+        max-width: 100%;
+        z-index: 10;
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
+    }
+
+    .conversations-sidebar.show {
+        transform: translateX(0);
+    }
+
+    .conversation-detail {
+        width: 100%;
+    }
+
+    .conversation-messages {
+        padding: 20px 5%;
+    }
+}

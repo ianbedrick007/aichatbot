@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block title %}Error {{ status_code }} - AI Chatbot{% endblock %}
+
+{% block body_class %}auth-body{% endblock %}
+
+{% block content %}
+    <div class="container d-flex justify-content-center align-items-center min-vh-100">
+        <div class="glass-card text-center">
+            <div class="card-body p-5">
+                <div class="mb-4">
+                    <i class="bi bi-exclamation-triangle text-warning" style="font-size: 4rem;"></i>
+                </div>
+                <h1 class="card-title text-white mb-2">{{ status_code }}</h1>
+                <h4 class="text-white mb-4">{{ title | default('Error Occurred') }}</h4>
+
+                <p class="text-white-50 mb-5">{{ message }}</p>
+
+                <a href="{{ url_for('home') }}" class="btn glass-btn w-100">
+                    <i class="bi bi-house-door me-2"></i>Return Home
+                </a>
+            </div>
+        </div>
+    </div>
+{% endblock %}

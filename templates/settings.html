@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - AI Chatbot{% endblock %}
+
+{% block head %}
+<style>
+    .settings-container {
+        max-width: 800px;
+        margin: 0 auto;
+    }
+
+    .settings-card {
+        background: rgba(255, 255, 255, 0.95);
+        border-radius: 15px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        padding: 30px;
+    }
+
+    .nav-links a {
+        color: #667eea;
+        text-decoration: none;
+        margin-right: 20px;
+        font-weight: 500;
+        transition: color 0.2s;
+    }
+
+    .nav-links a:hover {
+        color: #764ba2;
+        text-decoration: underline;
+    }
+
+    .help-text {
+        font-size: 13px;
+        color: #666;
+        margin-top: 5px;
+    }
+
+    .help-text code {
+        background: #f5f5f5;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-family: monospace;
+        color: #d63384;
+    }
+
+    .current-value {
+        background: #f8f9fa;
+        padding: 10px;
+        border-radius: 5px;
+        margin-top: 5px;
+        font-family: monospace;
+        font-size: 13px;
+        border: 1px solid #e9ecef;
+    }
+
+    .current-value.empty {
+        color: #999;
+        font-style: italic;
+    }
+</style>
+{% endblock %}
+
+{% block body_class %}auth-body{% endblock %}
+
+{% block content %}
+<!-- Navbar -->
+<nav class="navbar navbar-expand-lg glass-header mb-5">
+    <div class="container-fluid px-4">
+        <a class="navbar-brand d-flex align-items-center gap-2 text-white fw-bold" href="{{ url_for('home') }}">
+            <i class="bi bi-robot"></i> AI Chatbot
+        </a>
+
+        <div class="d-flex align-items-center gap-2">
+            <a href="{{ url_for('home') }}" class="btn btn-glass btn-sm">
+                <i class="bi bi-chat-dots"></i> Chat
+            </a>
+            <a href="{{ url_for('products') }}" class="btn btn-glass btn-sm">
+                <i class="bi bi-shop"></i> Products
+            </a>
+            <a href="{{ url_for('logout') }}" class="btn btn-glass btn-sm text-danger">
+                <i class="bi bi-box-arrow-right"></i>
+            </a>
+        </div>
+    </div>
+</nav>
+
+<div class="container settings-container pb-5">
+    <div class="glass-card">
+        <div class="card-body p-5">
+            <h1 class="card-title mb-2 text-white">Business Settings</h1>
+            <p class="text-white-50 mb-4">Configure your business settings and WhatsApp integration</p>
+
+            <!-- Flash Messages -->
+            {% if messages %}
+            {% for message in messages %}
+            <div class="alert alert-{{ 'danger' if category == 'error' else 'success' if category == 'success' else 'info' }} alert-dismissible fade show glass-alert"
+                 role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            {% endfor %}
+            {% endif %}
+
+            <form method="POST">
+                <div class="mb-4">
+                    <div class="input-field">
+                        <input
+                                type="text"
+                                class="form-control glass-input"
+                                id="phone_number_id"
+                                name="phone_number_id"
+                                value="#"
+                                placeholder=" "
+                        >
+                        <label for="phone_number_id" class="glass-label">WhatsApp Phone Number ID</label>
+                    </div>
+                    <div class="mt-2 text-white-50 small">
+                        <p class="mb-1">Enter your WhatsApp Business Phone Number ID from the Meta Developer Portal.</p>
+                        <p class="mb-0">Find it at: <code class="text-info bg-dark bg-opacity-50 px-1 rounded">Meta
+                            Business Suite → WhatsApp → API Setup</code></p>
+                    </div>
+
+                    {% if business.phone_number_id %}
+                    <div class="mt-2 p-2 rounded bg-success bg-opacity-10 border border-success border-opacity-25 text-success small font-monospace">
+                        <i class="bi bi-check-circle me-1"></i> Currently configured: {{ business.phone_number_id }}
+                    </div>
+                    {% else %}
+                    <div class="mt-2 p-2 rounded bg-secondary bg-opacity-10 border border-secondary border-opacity-25 text-secondary-custom small font-monospace">
+                        <i class="bi bi-exclamation-circle me-1"></i> Not configured yet
+                    </div>
+                    {% endif %}
+                </div>
+
+                <div class="mb-4">
+                    <div class="input-field">
+                        <input
+                                type="text"
+                                class="form-control glass-input"
+                                id="persona"
+                                name="persona"
+                                value="{{ business.persona or '' }}"
+                                placeholder=" "
+                        >
+                        <label for="persona" class="glass-label">Business Persona</label>
+                    </div>
+                    <div class="mt-2 text-white-50 small">
+                        <p class="mb-0">Enter your business persona here. This gives the AI a personalized way to
+                            respond to messages.</p>
+                    </div>
+
+                    {% if business.persona %}
+                    <div class="mt-2 p-2 rounded bg-success bg-opacity-10 border border-success border-opacity-25 text-success small font-monospace">
+                        <i class="bi bi-check-circle me-1"></i> Currently configured: {{ business.persona }}
+                    </div>
+                    {% else %}
+                    <div class="mt-2 p-2 rounded bg-secondary bg-opacity-10 border border-secondary border-opacity-25 text-secondary-custom small font-monospace">
+                        <i class="bi bi-exclamation-circle me-1"></i> Not configured yet
+                    </div>
+                    {% endif %}
+                </div>
+
+                <button type="submit" class="btn glass-btn w-100">
+                    <i class="bi bi-save me-2"></i>Save Settings
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
