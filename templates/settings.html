@@ -94,7 +94,7 @@
             {% if messages %}
             {% for message in messages %}
             <div class="alert alert-{{ 'danger' if category == 'error' else 'success' if category == 'success' else 'info' }} alert-dismissible fade show glass-alert"
-                 role="alert">
+                role="alert">
                 {{ message }}
                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
             </div>
@@ -104,14 +104,8 @@
             <form method="POST">
                 <div class="mb-4">
                     <div class="input-field">
-                        <input
-                                type="text"
-                                class="form-control glass-input"
-                                id="phone_number_id"
-                                name="phone_number_id"
-                                value="#"
-                                placeholder=" "
-                        >
+                        <input type="text" class="form-control glass-input" id="phone_number_id" name="phone_number_id"
+                            value="#" placeholder=" ">
                         <label for="phone_number_id" class="glass-label">WhatsApp Phone Number ID</label>
                     </div>
                     <div class="mt-2 text-white-50 small">
@@ -121,11 +115,13 @@
                     </div>
 
                     {% if business.phone_number_id %}
-                    <div class="mt-2 p-2 rounded bg-success bg-opacity-10 border border-success border-opacity-25 text-success small font-monospace">
+                    <div
+                        class="mt-2 p-2 rounded bg-success bg-opacity-10 border border-success border-opacity-25 text-success small font-monospace">
                         <i class="bi bi-check-circle me-1"></i> Currently configured: {{ business.phone_number_id }}
                     </div>
                     {% else %}
-                    <div class="mt-2 p-2 rounded bg-secondary bg-opacity-10 border border-secondary border-opacity-25 text-secondary-custom small font-monospace">
+                    <div
+                        class="mt-2 p-2 rounded bg-secondary bg-opacity-10 border border-secondary border-opacity-25 text-secondary-custom small font-monospace">
                         <i class="bi bi-exclamation-circle me-1"></i> Not configured yet
                     </div>
                     {% endif %}
@@ -133,27 +129,30 @@
 
                 <div class="mb-4">
                     <div class="input-field">
-                        <input
-                                type="text"
-                                class="form-control glass-input"
-                                id="persona"
-                                name="persona"
-                                value="{{ business.persona or '' }}"
-                                placeholder=" "
-                        >
+                        <textarea class="form-control glass-input" id="persona" name="persona" rows="8"
+                            placeholder=" ">{{ business.persona or '' }}</textarea>
                         <label for="persona" class="glass-label">Business Persona</label>
                     </div>
                     <div class="mt-2 text-white-50 small">
                         <p class="mb-0">Enter your business persona here. This gives the AI a personalized way to
-                            respond to messages.</p>
+                            respond to messages. You can provide detailed instructions (up to 250 words).</p>
                     </div>
 
                     {% if business.persona %}
-                    <div class="mt-2 p-2 rounded bg-success bg-opacity-10 border border-success border-opacity-25 text-success small font-monospace">
-                        <i class="bi bi-check-circle me-1"></i> Currently configured: {{ business.persona }}
+                    <div
+                        class="mt-2 p-3 rounded bg-success bg-opacity-10 border border-success border-opacity-25 text-success small">
+                        <div class="d-flex align-items-center mb-2">
+                            <i class="bi bi-check-circle me-2"></i>
+                            <strong>Currently configured:</strong>
+                        </div>
+                        <div style="white-space: pre-wrap; max-height: 150px; overflow-y: auto;"
+                            class="font-monospace opacity-75">
+                            {{ business.persona }}
+                        </div>
                     </div>
                     {% else %}
-                    <div class="mt-2 p-2 rounded bg-secondary bg-opacity-10 border border-secondary border-opacity-25 text-secondary-custom small font-monospace">
+                    <div
+                        class="mt-2 p-2 rounded bg-secondary bg-opacity-10 border border-secondary border-opacity-25 text-secondary-custom small font-monospace">
                         <i class="bi bi-exclamation-circle me-1"></i> Not configured yet
                     </div>
                     {% endif %}
