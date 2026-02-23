@@ -1,8 +1,8 @@
 from __future__ import annotations
-from pydantic import BaseModel, ConfigDict, Field
+
 from datetime import datetime
 
-from sqlalchemy.orm import Mapped
+from pydantic import BaseModel, ConfigDict, Field
 
 
 # User Schemas
@@ -106,6 +106,7 @@ class ProductResponse(ProductBase):
     id: int
     business_id: int
     created_at: datetime
+    has_embedding: bool = False
 
 
 # Message Schemas
@@ -124,3 +125,13 @@ class MessageResponse(MessageBase):
     id: int
     business_id: int
     timestamp: datetime
+
+
+class ToggleAIRequest(BaseModel):
+    customer_id: str
+    enable_ai: bool
+    message: str | None = None
+
+
+class ChatRequest(BaseModel):
+    message: str

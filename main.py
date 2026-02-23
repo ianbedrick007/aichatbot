@@ -1,9 +1,10 @@
+
+# Import necessary libraries and modules
 import os
 from contextlib import asynccontextmanager
 from typing import Annotated
 
-from fastapi import FastAPI, Request, HTTPException, status, Depends, Query
-from fastapi import Form
+from fastapi import FastAPI, Request, status, Depends, Form
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, RedirectResponse
@@ -19,75 +20,94 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from ai.run_ai import get_ai_response, update_conversation_history, get_conversation_history
 from auth import create_access_token
 from database import get_db, engine, get_current_user
-from models import Business
-from models import User, Base, Message, Product
+from models import Business, User, Base, Product
 from routers import products, users
-# Import WhatsApp bot router
 from whatsapp_bot.app import router as whatsapp_router, configure_logging
-from whatsapp_bot.app.utils.whatsapp_utils import toggle_ai_status, get_text_message_input, send_message, \
-    AI_DISABLED_USERS
 
 
+# Define the application lifespan
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    # Startup
-    Base.metadata.create_all(bind=engine)
-    configure_logging()  # Configure WhatsApp bot logging
+    """
+    Application lifespan context manager.
+    Handles startup and shutdown tasks.
+    """
+    Base.metadata.create_all(bind=engine)  # Create database tables
+    configure_logging()  # Configure logging for the WhatsApp bot
     yield
 
 
+# Initialize the FastAPI application
 app = FastAPI(lifespan=lifespan)
 
-# Add middleware to handle proxy headers for HTTPS
+# Middleware to handle proxy headers for HTTPS
 app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
 
-# Get the directory where main.py is located
+# Define static and media directories
 current_dir = os.path.dirname(os.path.realpath(__file__))
 static_dir = os.path.join(current_dir, "static")
 media_dir = os.path.join(current_dir, "media")
 
+# Mount static and media directories
 app.mount("/static", StaticFiles(directory="static"), name="static")
 app.mount("/media", StaticFiles(directory="media"), name="media")
 
+# Print application loading message
 print("--- Loading main.py application ---")
 
+# Initialize Jinja2 templates
 templates = Jinja2Templates(directory="templates")
 
-# Include routers
+# Include routers for different modules
 app.include_router(users.router, prefix="/api/users", tags=["users"])
 app.include_router(products.router, prefix="", tags=["posts"])
 app.include_router(whatsapp_router, prefix="/api/whatsapp", tags=["whatsapp"])
 
 
-@app.get("/", include_in_schema=False, name="home")
-def chat_page(
-        request: Request,
-        db: Session = Depends(get_db),
-        current_user: User = Depends(get_current_user)
-):
-    # Fetch business for this user
-    business = db.execute(
-        select(Business).where(Business.user_id == current_user.id)
-    ).scalar()
+# Define routes and their handlers
+@app.get("/chat", include_in_schema=False, name="home")
+def chat_page(request: Request, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """
+    Render the chat page for the current user.
+
+    Args:
+        request (Request): The HTTP request object.
+        db (Session): The database session.
+        current_user (User): The currently authenticated user.
+
+    Returns:
+        TemplateResponse: The rendered chat page.
+    """
+    business = db.execute(select(Business).where(Business.user_id == current_user.id)).scalar()
 
     if not business:
         response = RedirectResponse(url="/logout", status_code=303)
         response.set_cookie("error", "No business found for this account.")
         return response
 
-    return templates.TemplateResponse(
-        "chat.html",
-        {"request": request, "business": business}
-    )
+    return templates.TemplateResponse("chat.html", {"request": request, "business": business})
 
 
-@app.post("/", include_in_schema=False)
+# Additional routes and handlers are defined below with similar docstrings and comments for clarity.
+
+
+@app.post("/chat", include_in_schema=False)
 async def chat_post(
-        request: Request,
         db: Session = Depends(get_db),
         current_user: User = Depends(get_current_user),
         message: str = Form(...)
 ):
+    """
+        Send message to AI for the current user.
+
+        Args:
+            db (Session): The database session.
+            current_user (User): The currently authenticated user.
+            message(str): The message sent by the user.
+
+        Returns:
+            RedirectResponse: The rendered chat page.
+        """
     # Fetch business
     business = db.execute(
         select(Business).where(Business.user_id == current_user.id)
@@ -141,11 +161,9 @@ async def chat_post(
             platform="web"
         )
 
-    return RedirectResponse(url="/", status_code=303)
+    return RedirectResponse(url="/chat", status_code=303)
 
 
-class ChatRequest(BaseModel):
-    message: str
 
 
 @app.get("/conversations", name="conversations")
@@ -154,6 +172,17 @@ def conversations_page(
         db: Session = Depends(get_db),
         current_user: User = Depends(get_current_user)
 ):
+    """
+    Render the conversations management page.
+
+    Args:
+        request (Request): The HTTP request object.
+        db (Session): The database session.
+        current_user (User): The currently authenticated user.
+
+    Returns:
+        TemplateResponse: The rendered conversations page or a redirect if no business exists.
+    """
     business = db.execute(select(Business).where(Business.user_id == current_user.id)).scalar()
     if not business:
         return RedirectResponse(url="/", status_code=303)
@@ -164,216 +193,34 @@ def conversations_page(
     )
 
 
-@app.get("/api/live-messages")
-def get_live_messages(
+@app.get("/", name="home")
+def dashboard_page(
         request: Request,
-        after_id: int = Query(0),
-        db: Session = Depends(get_db),
+        db: Annotated[Session, Depends(get_db)],
         current_user: User = Depends(get_current_user)
 ):
-    business = db.execute(select(Business).where(Business.user_id == current_user.id)).scalar()
-    if not business:
-        raise HTTPException(status_code=404, detail="Business not found")
+    """
+    Render the main dashboard page for the authenticated user.
 
-    # ✅ Fetch only WHATSAPP messages newer than 'after_id'
-    new_messages = (
-        db.query(Message)
-        .filter(Message.business_id == business.id)
-        .filter(Message.id > after_id)
-        .filter(Message.platform == 'whatsapp')  # <--- STRICT FILTER
-        .order_by(Message.id.asc())
-        .limit(50)
-        .all()
+    Args:
+        request (Request): The HTTP request object.
+        db (Session): The database session.
+        current_user (User): The currently authenticated user.
+
+    Returns:
+        TemplateResponse: The rendered dashboard with business statistics.
+    """
+    business = db.query(Business).filter(Business.user_id == current_user.id).first()
+    products_count = db.query(Product).filter(Product.business_id == business.id).count() if business else 0
+
+    # TODO 1: add orders, payments, payouts, invoices and ai credits to Business model.
+    return templates.TemplateResponse(
+        "dashboard.html",
+        {
+            "request": request, "business": business, "products_count": products_count,
+            "orders": [], "payments": [], "payouts": [], "invoices": [], "ai_credits": None,
+        }
     )
-
-    return {
-        "messages": [
-            {
-                "id": msg.id,
-                "text": msg.text,
-                "sender": msg.sender,
-                "timestamp": msg.timestamp.strftime("%H:%M"),
-                "is_bot": msg.sender == 'bot'
-            }
-            for msg in new_messages
-        ]
-    }
-
-
-@app.get("/api/customers", tags=["conversations"])
-def get_customers_list(
-        db: Session = Depends(get_db),
-        current_user: User = Depends(get_current_user)
-):
-    """Get list of unique WhatsApp customers with their latest messages"""
-    business = db.execute(select(Business).where(Business.user_id == current_user.id)).scalar()
-    if not business:
-        raise HTTPException(status_code=404, detail="Business not found")
-
-    # Get all WhatsApp messages for this business
-    whatsapp_messages = (
-        db.query(Message)
-        .filter(Message.business_id == business.id)
-        .filter(Message.platform == 'whatsapp')
-        .order_by(Message.timestamp.desc())
-        .all()
-    )
-
-    # Group by unique customer ID
-    customers = {}
-    for msg in whatsapp_messages:
-        c_id = msg.customer_id
-        if not c_id: continue
-
-        if c_id not in customers:
-            customers[c_id] = {
-                "id": c_id,
-                "name": msg.customer_name or c_id,
-                "last_message": msg.text[:50] + "..." if msg.text and len(msg.text) > 50 else (msg.text or ""),
-                "last_timestamp": msg.timestamp.strftime("%Y-%m-%d %H:%M"),
-                "message_count": 1,
-                "ai_enabled": c_id not in AI_DISABLED_USERS
-            }
-        else:
-            customers[c_id]["message_count"] += 1
-
-    return {"customers": list(customers.values())}
-
-
-@app.get("/api/customer-messages/{customer_name}", tags=["conversations"])
-def get_customer_messages(
-        customer_name: str,
-        db: Session = Depends(get_db),
-        current_user: User = Depends(get_current_user)
-):
-    """Get all messages for a specific WhatsApp customer"""
-    business = db.execute(select(Business).where(Business.user_id == current_user.id)).scalar()
-    if not business:
-        raise HTTPException(status_code=404, detail="Business not found")
-
-    # Get all messages (both customer and bot) for this specific conversation
-    messages = (
-        db.query(Message)
-        .filter(Message.business_id == business.id)
-        .filter(Message.platform == 'whatsapp')
-        .filter(Message.customer_id == customer_name)  # customer_name route param is actually c_id/wa_id
-        .order_by(Message.timestamp.asc())
-        .all()
-    )
-
-    return {
-        "customer_name": customer_name,
-        "messages": [
-            {
-                "id": msg.id,
-                "text": msg.text,
-                "sender": msg.customer_name if not msg.is_bot else "bot",
-                "timestamp": msg.timestamp.strftime("%H:%M"),
-                "is_bot": msg.is_bot
-            }
-            for msg in messages
-        ]
-    }
-
-
-class ToggleAIRequest(BaseModel):
-    customer_id: str
-    enable_ai: bool
-    message: str | None = None
-
-
-@app.post("/api/toggle-ai", tags=["chat"])
-def api_toggle_ai(
-        request: ToggleAIRequest,
-        db: Session = Depends(get_db),
-        current_user: User = Depends(get_current_user)
-):
-    # Fetch business to ensure context
-    business = db.execute(
-        select(Business).where(Business.user_id == current_user.id)
-    ).scalar()
-
-    if not business:
-        raise HTTPException(status_code=404, detail="No business found")
-
-    # Update the AI status
-    toggle_ai_status(request.customer_id, request.enable_ai)
-
-    # If disabling AI and a message is provided, send it
-    if not request.enable_ai and request.message:
-        # Send to WhatsApp
-        data = get_text_message_input(request.customer_id, request.message)
-        response = send_message(data)
-
-        if not response:
-            raise HTTPException(status_code=400,
-                                detail="Failed to send WhatsApp message. The customer ID might be invalid (names are not allowed, only phone numbers).")
-
-        # Save to database so it appears in the chat history
-        # Since we don't have the profile name here, we'll try to find it from previous messages or use ID
-        prev_msg = db.query(Message).filter_by(customer_id=request.customer_id).first()
-        customer_name = prev_msg.customer_name if prev_msg else request.customer_id
-
-        update_conversation_history(
-            db=db,
-            business_id=business.id,
-            text=request.message,
-            sender='bot',
-            customer_id=request.customer_id,
-            customer_name=customer_name,
-            is_bot=True,
-            platform='whatsapp'
-        )
-
-    return {"status": "success", "ai_enabled": request.enable_ai}
-
-
-@app.post("/api/chat", tags=["chat"])
-async def api_chat_post(
-        request: ChatRequest,
-        db: Session = Depends(get_db),
-        current_user: User = Depends(get_current_user)
-):
-    # Fetch business
-    business = db.execute(
-        select(Business).where(Business.user_id == current_user.id)
-    ).scalar()
-
-    if not business:
-        raise HTTPException(status_code=404, detail="No business found for this account.")
-
-    user_message = request.message.strip()
-
-    if user_message:
-        # Get last 20 messages for context
-        recent_messages = (
-            db.query(Message)
-            .filter(Message.business_id == business.id)
-            .order_by(Message.timestamp.desc())
-            .limit(20)
-            .all()
-        )
-
-        conversation_history = [
-            {"text": msg.text, "sender": msg.sender, "is_bot": msg.is_bot}
-            for msg in reversed(recent_messages)
-        ]
-
-        # Save user message
-        user_msg = Message(business_id=business.id, text=user_message, sender="user", is_bot=False)
-        db.add(user_msg)
-        db.commit()
-
-        # AI response
-        bot_response = get_ai_response(user_message, db, conversation_history, business_id=business.id)
-
-        # Save bot message
-        bot_msg = Message(business_id=business.id, text=bot_response, sender="bot", is_bot=True)
-        db.add(bot_msg)
-        db.commit()
-
-        return {"response": bot_response}
-    return {"response": "I didn't catch that."}
 
 
 @app.post("/login")
@@ -381,6 +228,16 @@ async def login_post(
         request: Request,
         db: Session = Depends(get_db)
 ):
+    """
+    Handle the login form submission.
+
+    Args:
+        request (Request): The HTTP request object containing form data.
+        db (Session): The database session.
+
+    Returns:
+        Response: A RedirectResponse to the dashboard on success, or the login page with an error message on failure.
+    """
     form = await request.form()
     username = form.get("username")
     password = form.get("password")
@@ -391,7 +248,7 @@ async def login_post(
     ).scalar()
 
     # Invalid credentials → re-render login page
-    if not user or not check_password_hash(user.password_hash, password):
+    if not user or not check_password_hash(str(user.password_hash), password):
         return templates.TemplateResponse(
             "login.html",
             {"request": request, "error": "Invalid credentials"},
@@ -417,6 +274,15 @@ async def login_post(
 
 @app.get("/login")
 def login(request: Request):
+    """
+    Render the login page.
+
+    Args:
+        request (Request): The HTTP request object.
+
+    Returns:
+        TemplateResponse: The rendered login page.
+    """
     return templates.TemplateResponse("login.html", {
         "request": request
     })
@@ -429,6 +295,16 @@ def signup_page(request: Request):
 
 @app.post("/signup")
 async def signup_post(request: Request, db: Annotated[Session, Depends(get_db)]):
+    """
+    Handle the user registration process.
+
+    Args:
+        request (Request): The HTTP request object containing form data.
+        db (Session): The database session.
+
+    Returns:
+        Response: A RedirectResponse to the login page on success, or the signup page with an error message.
+    """
     form = await request.form()
     username = form.get("username")
     password = form.get("password")
@@ -474,6 +350,17 @@ def list_products(
         db: Annotated[Session, Depends(get_db)],
         current_user: User = Depends(get_current_user)
 ):
+    """
+    Render the products management page for the current business.
+
+    Args:
+        request (Request): The HTTP request object.
+        db (Session): The database session.
+        current_user (User): The currently authenticated user.
+
+    Returns:
+        TemplateResponse: The rendered products page or a redirect if no business exists.
+    """
     business = db.execute(select(Business).where(Business.user_id == current_user.id)).scalar()
     if not business:
         return RedirectResponse(url="/", status_code=303)
@@ -489,6 +376,17 @@ def list_products(
 @app.post("/settings", tags=["Settings"])
 async def settings_post(request: Request, db: Annotated[Session, Depends(get_db)],
                         current_user: User = Depends(get_current_user)):
+    """
+    Handle the settings form submission to update business profile.
+
+    Args:
+        request (Request): The HTTP request object containing form data.
+        db (Session): The database session.
+        current_user (User): The currently authenticated user.
+
+    Returns:
+        TemplateResponse: The rendered settings page with success or error messages.
+    """
     form = await request.form()
     phone_number_id = form.get("phone_number_id")
     persona = form.get("persona")
@@ -498,6 +396,14 @@ async def settings_post(request: Request, db: Annotated[Session, Depends(get_db)
     persona = persona.strip() if persona and persona.strip() else None
 
     business = db.execute(select(Business).where(Business.user_id == current_user.id)).scalar()
+
+    if not business:
+        return templates.TemplateResponse(
+            "settings.html",
+            {"request": request, "business": None,
+             "messages": ["No business profile found for your account. Please contact support."],
+             "category": "error"}
+        )
 
     # Check if phone number is already taken by another business
     if phone_number_id:
@@ -528,6 +434,17 @@ async def settings_post(request: Request, db: Annotated[Session, Depends(get_db)
 @app.get("/settings", tags=["Settings"], name="settings")
 def settings_page(request: Request, db: Annotated[Session, Depends(get_db)],
                   current_user: User = Depends(get_current_user)):
+    """
+    Render the settings page for the current user's business.
+
+    Args:
+        request (Request): The HTTP request object.
+        db (Session): The database session.
+        current_user (User): The currently authenticated user.
+
+    Returns:
+        TemplateResponse: The rendered settings page with business details.
+    """
     business = db.execute(select(Business).where(Business.user_id == current_user.id)).scalar()
 
     return templates.TemplateResponse(
@@ -536,7 +453,7 @@ def settings_page(request: Request, db: Annotated[Session, Depends(get_db)],
 
 
 @app.get("/logout", tags=["Users"])
-def logout(request: Request):
+def logout():
     response = RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
     response.delete_cookie("access_token")
     return response

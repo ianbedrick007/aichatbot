@@ -1,9 +1,8 @@
-import logging
 import base64
+import logging
 import re
 
 import requests
-from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from ai.run_ai import get_ai_response, get_conversation_history, update_conversation_history, clear_conversation_history
@@ -20,6 +19,7 @@ def toggle_ai_status(wa_id: str, enable: bool):
             AI_DISABLED_USERS.remove(wa_id)
     else:
         AI_DISABLED_USERS.add(wa_id)
+
 
 def log_http_response(response):
     logging.info(f"Status: {response.status_code}")
@@ -105,7 +105,7 @@ def process_whatsapp_message(body, db: Session):
     # Safe extraction of contact info
     contact = body["entry"][0]["changes"][0]["value"]["contacts"][0]
     wa_id = contact.get("wa_id")
-    name = contact.get("profile", {}).get("name", wa_id) # Fallback to ID if name missing
+    name = contact.get("profile", {}).get("name", wa_id)  # Fallback to ID if name missing
 
     message = body["entry"][0]["changes"][0]["value"]["messages"][0]
     message_type = message.get("type")
@@ -147,9 +147,9 @@ def process_whatsapp_message(body, db: Session):
 
     # ✅ Save incoming user message to database
     update_conversation_history(
-        business_id=business.id, 
-        text=message_body, 
-        sender=wa_id, 
+        business_id=business.id,
+        text=message_body,
+        sender=wa_id,
         customer_id=wa_id,
         customer_name=name,
         is_bot=False,
@@ -171,13 +171,14 @@ def process_whatsapp_message(body, db: Session):
         conversation_history = []
         response = "History refreshed. How can I help you today?"
     else:
-        response = get_ai_response(message_body, db, conversation_history, business_id=business.id, user_name=name, image_data=image_data)
+        response = get_ai_response(message_body, db, conversation_history, business_id=business.id, user_name=name,
+                                   image_data=image_data)
 
     # ✅ Save bot response to database
     update_conversation_history(
-        business_id=business.id, 
-        text=response, 
-        sender='bot', 
+        business_id=business.id,
+        text=response,
+        sender='bot',
         customer_id=wa_id,
         customer_name=name,
         is_bot=True,

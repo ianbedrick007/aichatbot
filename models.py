@@ -1,6 +1,7 @@
 from __future__ import annotations
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, Float, BigInteger, Boolean
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, Float, BigInteger, Boolean, func, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship, DeclarativeBase
+from pgvector.sqlalchemy import Vector
 from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -20,15 +21,17 @@ class Business(Base):
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey('users.id'), nullable=False, unique=True)
 
     # ✅ NEW: WhatsApp phone number ID mapping
-    # Changed to BigInteger to support large phone number IDs
+    # Stored as String to safely support large phone number IDs
     phone_number_id: Mapped[str | None] = mapped_column(String, unique=True, nullable=True)
 
     # ✅ Business persona: defines the AI's personality/instructions
     persona: Mapped[str] = mapped_column(Text, nullable=True)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
+    user: Mapped["User"] = relationship("User", back_populates="business")
     messages_list = relationship('Message', back_populates='business', lazy=True, cascade='all, delete-orphan')
+    products: Mapped[list["Product"]] = relationship("Product", back_populates="business", lazy=True)
 
 
 # User model
@@ -39,11 +42,11 @@ class User(Base):
     username: Mapped[str] = mapped_column(String(80), unique=True, nullable=False)
     email: Mapped[str] = mapped_column(String(120), unique=True, nullable=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     # ✅ 1:1 relationship: one user has one business (business is the "account")
-    business = relationship('Business', backref='user', uselist=False, lazy=True,
-                            cascade='all, delete-orphan')
+    business: Mapped["Business"] = relationship('Business', back_populates='user', uselist=False, lazy=True,
+                                                cascade='all, delete-orphan')
 
     def set_password(self, password):
         """Hash and set the user's password"""
@@ -71,7 +74,7 @@ class Message(Base):
     text: Mapped[str] = mapped_column(Text, nullable=True)
     sender: Mapped[str] = mapped_column(String(120), nullable=False)  # 'wa_id' or 'bot' or 'user'
     is_bot: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    timestamp: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     # Relationship back to business
     business = relationship('Business', back_populates='messages_list', lazy=True)
@@ -88,9 +91,11 @@ class Product(Base):
     description: Mapped[str] = mapped_column(Text, nullable=True)
     price: Mapped[float] = mapped_column(Float, nullable=False)
     image_url: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text('true'))
+    image_embedding = mapped_column(Vector(1408), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
-    business: Mapped["Business"] = relationship('Business', backref='products', lazy=True)
+    business: Mapped["Business"] = relationship('Business', back_populates='products', lazy=True)
 
     # @property
     # def image_path(self) -> str:

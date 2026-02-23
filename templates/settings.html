@@ -105,7 +105,7 @@
                 <div class="mb-4">
                     <div class="input-field">
                         <input type="text" class="form-control glass-input" id="phone_number_id" name="phone_number_id"
-                            value="#" placeholder=" ">
+                            value="{{ business.phone_number_id if business else '' }}" placeholder=" ">
                         <label for="phone_number_id" class="glass-label">WhatsApp Phone Number ID</label>
                     </div>
                     <div class="mt-2 text-white-50 small">
@@ -114,7 +114,7 @@
                             Business Suite → WhatsApp → API Setup</code></p>
                     </div>
 
-                    {% if business.phone_number_id %}
+                    {% if business and business.phone_number_id %}
                     <div
                         class="mt-2 p-2 rounded bg-success bg-opacity-10 border border-success border-opacity-25 text-success small font-monospace">
                         <i class="bi bi-check-circle me-1"></i> Currently configured: {{ business.phone_number_id }}
@@ -130,7 +130,7 @@
                 <div class="mb-4">
                     <div class="input-field">
                         <textarea class="form-control glass-input" id="persona" name="persona" rows="8"
-                            placeholder=" ">{{ business.persona or '' }}</textarea>
+                            placeholder=" ">{{ (business.persona if business else '') or '' }}</textarea>
                         <label for="persona" class="glass-label">Business Persona</label>
                     </div>
                     <div class="mt-2 text-white-50 small">
@@ -138,7 +138,7 @@
                             respond to messages. You can provide detailed instructions (up to 250 words).</p>
                     </div>
 
-                    {% if business.persona %}
+                    {% if business and business.persona %}
                     <div
                         class="mt-2 p-3 rounded bg-success bg-opacity-10 border border-success border-opacity-25 text-success small">
                         <div class="d-flex align-items-center mb-2">

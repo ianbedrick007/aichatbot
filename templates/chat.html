@@ -10,11 +10,11 @@
     <header class="chat-header-glass">
         <div class="header-left">
             <div class="avatar-circle">
-                <span class="avatar-initial">{{ user.username[0].upper() if user else 'G' }}</span>
+                <img src="{{ url_for('static', path='assets/omni-face.png') }}" alt="Omni Ai"
+                    style="width: 32px; height: 32px; object-fit: contain;">
             </div>
             <div class="header-info">
-                <h1 class="header-title">{{ business.persona if business and business.persona else 'AI Assistant' }}
-                </h1>
+                <h1 class="header-title">Omni Ai</h1>
                 <div class="status-indicator">
                     <span class="status-dot"></span>
                     <span class="status-text">Online</span>

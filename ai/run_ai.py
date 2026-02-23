@@ -1,18 +1,20 @@
 import json
 import os
 import traceback
+
 from dotenv import load_dotenv
 from openai import OpenAI
 from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
+
 from ai.prompts import system_prompt
-from ai.tools import get_weather, get_exchange_rate, get_products, tools, get_rate
-from models import Message
+from ai.tools import get_weather, get_exchange_rate, get_products, tools, get_rate, search_similar_products
+from models import Message, Business
 from payment.payment import initialize_payment, verify_payment
-from sqlalchemy.orm import sessionmaker, Session
 
 load_dotenv()
 
-api_key =  os.getenv("OPENAI_API_KEY")
+api_key = os.getenv("OPENAI_API_KEY")
 ai_model = os.getenv("OPEN_ROUTER_MODEL")
 client = OpenAI(
     base_url="https://openrouter.ai/api/v1",
@@ -40,7 +42,8 @@ available_functions = {
     "get_products": get_products,
     "get_rate": get_rate,
     "initialize_payment": initialize_payment,
-    "verify_payment": verify_payment
+    "verify_payment": verify_payment,
+    "search_similar_products": search_similar_products
 }
 
 
@@ -53,6 +56,10 @@ def call_function(function_name, db, **kwargs):
     """Call a function, injecting business_id if needed"""
     # ✅ Inject business_id for get_products
     if function_name == "get_products" and _current_business_id:
+        kwargs['db'] = db
+        kwargs['business_id'] = _current_business_id
+    # ✅ Inject db and business_id for search_similar_products
+    if function_name == "search_similar_products" and _current_business_id:
         kwargs['db'] = db
         kwargs['business_id'] = _current_business_id
     if function_name == "initialize_payment" and 'callback_url' not in kwargs:
@@ -82,6 +89,10 @@ def get_ai_response(user_input, db, conversation_history=None, business_id=None,
     messages = [
         {"role": "system", "content": system_prompt}
     ]
+    business_obj = db.query(Business).filter_by(id=business_id).first()
+    business_prompt = business_obj.persona if business_obj else None
+    if business_prompt:
+        messages.append({"role": "system", "content": business_prompt})
 
     # ✅ Add user name context if available
     if user_name:
@@ -179,7 +190,7 @@ def get_conversation_history(business_id, customer_id, db: Session, limit=20):
     """Retrieve recent conversation history for a specific business and customer."""
 
     recent_messages = db.query(Message).filter_by(
-        business_id=business_id, 
+        business_id=business_id,
         customer_id=customer_id
     ).order_by(Message.timestamp.desc()) \
         .limit(limit) \
@@ -187,8 +198,8 @@ def get_conversation_history(business_id, customer_id, db: Session, limit=20):
 
     return [
         {
-            'sender': msg.sender, 
-            'text': msg.text, 
+            'sender': msg.sender,
+            'text': msg.text,
             'customer_name': msg.customer_name,
             'is_bot': msg.is_bot
         }
@@ -196,12 +207,13 @@ def get_conversation_history(business_id, customer_id, db: Session, limit=20):
     ]
 
 
-def update_conversation_history(db, business_id, text, sender, customer_id=None, customer_name=None, is_bot=False, platform="web"):
+def update_conversation_history(db, business_id, text, sender, customer_id=None, customer_name=None, is_bot=False,
+                                platform="web"):
     """Save a message to the database with isolation support."""
     new_msg = Message(
-        business_id=business_id, 
-        text=text, 
-        sender=sender, 
+        business_id=business_id,
+        text=text,
+        sender=sender,
         customer_id=customer_id,
         customer_name=customer_name,
         is_bot=is_bot,

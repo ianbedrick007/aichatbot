@@ -35,7 +35,7 @@
 }
 
 body {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+    font-family: 'Oxanium', sans-serif;
     background-color: var(--md-background);
     color: var(--md-text-primary);
     height: 100vh;
@@ -408,7 +408,7 @@ body {
     background: transparent;
     color: #fff;
     font-size: 15px;
-    font-family: 'Inter', sans-serif;
+    font-family: 'Oxanium', sans-serif;
     outline: none;
     padding: 8px 0;
     font-weight: 400;
@@ -523,7 +523,7 @@ body {
     text-decoration: none;
     transition: background 0.2s, box-shadow 0.2s;
     display: inline-block;
-    font-family: 'Roboto', sans-serif;
+    font-family: 'Oxanium', sans-serif;
 }
 
 .header-button:hover {
@@ -720,7 +720,7 @@ body {
     border: none;
     background: transparent;
     font-size: 14px;
-    font-family: 'Roboto', 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+    font-family: 'Oxanium', sans-serif;
     resize: none;
     outline: none;
     padding: var(--md-spacing-sm) 0;
@@ -1052,7 +1052,7 @@ body {
     background: url('../assets/shashank-hegde-ZugiKXUz-yc-unsplash.jpg') center center;
     background-size: cover;
     background-attachment: fixed;
-    font-family: 'Inter', sans-serif;
+    font-family: 'Oxanium', sans-serif;
     padding-top: 20px;
     color: #fff;
     display: block;

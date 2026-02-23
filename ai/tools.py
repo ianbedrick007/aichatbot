@@ -1,12 +1,12 @@
-from dotenv import load_dotenv
 import os
 
 import requests
-
-from sqlalchemy.orm import Session
+from dotenv import load_dotenv
 from sqlalchemy import select
+from sqlalchemy.orm import Session
+
 from models import Product
-from payment.payment import initialize_payment, verify_payment
+from ai.image_embeddings import generate_text_embedding
 
 load_dotenv()
 
@@ -18,7 +18,8 @@ tools = [
         "type": "function",
         "function": {
             "name": "get_weather",
-            "description": "Get the current temperature for a specific geographic location using latitude and longitude",
+            "description": "Get the current temperature for a specific geographic location using latitude and longitude"
+            ,
             "strict": True,
             "parameters": {
                 "type": "object",
@@ -147,6 +148,29 @@ tools = [
             },
             "required": ["reference"]
         }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "search_similar_products",
+            "description": "Search for products that are visually or semantically similar to a text description. Use when a customer describes what they're looking for or wants to find products similar to something.",
+            "strict": True,
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "Text description of what the user is looking for (e.g., 'red sneakers', 'leather handbag', 'gold necklace')"
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Maximum number of results to return (default 5)"
+                    }
+                },
+                "required": ["query", "limit"],
+                "additionalProperties": False
+            }
+        }
     }
 
 ]
@@ -237,5 +261,43 @@ def get_rate(pair, side, amount_crypto, amount_fiat):
         print("Quote created successfully:")
         print(quote)
         return quote
+    except Exception as e:
+        return {"error": str(e)}
+
+
+def search_similar_products(query: str, limit: int, db: Session = None, business_id: int = None):
+    """
+    Search for products similar to a text description using vector embeddings.
+    """
+    try:
+        if not db or not business_id:
+            return {"error": "Database session and business ID required"}
+
+        # Generate embedding from query text
+        query_embedding = generate_text_embedding(query)
+        if not query_embedding:
+            return {"error": "Could not generate search embedding"}
+
+        # Query using pgvector cosine distance
+        results = db.query(Product).filter(
+            Product.business_id == business_id,
+            Product.image_embedding.isnot(None)
+        ).order_by(
+            Product.image_embedding.cosine_distance(query_embedding)
+        ).limit(limit or 5).all()
+
+        if not results:
+            return {"message": "No products with image embeddings found. Try uploading product images first."}
+
+        return [
+            {
+                "id": p.id,
+                "name": p.name,
+                "description": p.description,
+                "price": p.price,
+                "image_url": p.image_url
+            }
+            for p in results
+        ]
     except Exception as e:
         return {"error": str(e)}
