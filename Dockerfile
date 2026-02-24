@@ -19,6 +19,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application source code
 COPY --chown=appuser:appuser . .
 
+# Ensure media directories exist (empty dirs aren't tracked by git)
+RUN mkdir -p /app/media/product_pics /app/media/products && chown -R appuser:appuser /app/media
+
 # Use non-privileged user
 USER appuser
 

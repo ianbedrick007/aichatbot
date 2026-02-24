@@ -74,7 +74,7 @@ class Message(Base):
     text: Mapped[str] = mapped_column(Text, nullable=True)
     sender: Mapped[str] = mapped_column(String(120), nullable=False)  # 'wa_id' or 'bot' or 'user'
     is_bot: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    timestamp: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    timestamp: Mapped[datetime] = mapped_column(DateTime, default=func.now(), server_default=func.now())
 
     # Relationship back to business
     business = relationship('Business', back_populates='messages_list', lazy=True)

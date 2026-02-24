@@ -48,9 +48,13 @@ current_dir = os.path.dirname(os.path.realpath(__file__))
 static_dir = os.path.join(current_dir, "static")
 media_dir = os.path.join(current_dir, "media")
 
+# Ensure media directories exist
+os.makedirs(os.path.join(media_dir, "product_pics"), exist_ok=True)
+os.makedirs(os.path.join(media_dir, "products"), exist_ok=True)
+
 # Mount static and media directories
 app.mount("/static", StaticFiles(directory="static"), name="static")
-app.mount("/media", StaticFiles(directory="media"), name="media")
+app.mount("/media", StaticFiles(directory=media_dir), name="media")
 
 # Print application loading message
 print("--- Loading main.py application ---")

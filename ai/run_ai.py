@@ -16,10 +16,19 @@ load_dotenv()
 
 api_key = os.getenv("OPENAI_API_KEY")
 ai_model = os.getenv("OPEN_ROUTER_MODEL")
-client = OpenAI(
-    base_url="https://openrouter.ai/api/v1",
-    api_key=api_key
-)
+
+_client = None
+
+
+def _get_client():
+    """Lazily initialize the OpenAI client to avoid crashing at import time."""
+    global _client
+    if _client is None:
+        _client = OpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=api_key
+        )
+    return _client
 
 # ✅ Store business_id as a context variable
 _current_business_id = None
@@ -43,7 +52,9 @@ available_functions = {
     "get_rate": get_rate,
     "initialize_payment": initialize_payment,
     "verify_payment": verify_payment,
-    "search_similar_products": search_similar_products
+    "search_similar_products": search_similar_products,
+    "search_by_image": search_by_image,
+
 }
 
 
@@ -65,6 +76,9 @@ def call_function(function_name, db, **kwargs):
     if function_name == "initialize_payment" and 'callback_url' not in kwargs:
         # Inject the default callback URL if not provided by the AI
         kwargs['callback_url'] = f"{os.getenv('AI_BASE_URL')}/paystack/callback"
+    if function_name == "search_by_image" and _current_business_id:
+        kwargs['db'] = db
+        kwargs['business_id'] = _current_business_id
 
     return available_functions[function_name](**kwargs)
 
@@ -137,7 +151,7 @@ def get_ai_response(user_input, db, conversation_history=None, business_id=None,
 
     try:
         # 2. First model call
-        completion = client.chat.completions.create(
+        completion = _get_client().chat.completions.create(
             model=ai_model,
             messages=messages,
             tools=tools,
@@ -170,7 +184,7 @@ def get_ai_response(user_input, db, conversation_history=None, business_id=None,
                 })
 
             # 5. Second API call with all function results
-            second_completion = client.chat.completions.create(
+            second_completion = _get_client().chat.completions.create(
                 model=ai_model,
                 messages=messages,
                 tools=tools,
