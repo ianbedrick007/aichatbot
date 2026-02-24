@@ -8,7 +8,7 @@ enabling cross-modal similarity search.
 
 import os
 from pathlib import Path
-
+import vertexai
 from dotenv import load_dotenv
 from google.cloud import aiplatform
 from vertexai.vision_models import MultiModalEmbeddingModel, Image as VertexImage
@@ -16,7 +16,7 @@ from vertexai.vision_models import MultiModalEmbeddingModel, Image as VertexImag
 load_dotenv()
 
 # Vertex AI config from environment
-GCP_PROJECT = os.getenv("GCP_PROJECT_ID")
+GCP_PROJECT = os.getenv("GCP_PROJECT_ID") or os.getenv("GOOGLE_CLOUD_PROJECT")
 GCP_LOCATION = os.getenv("GCP_LOCATION", "us-central1")
 EMBEDDING_DIM = 1408  # multimodalembedding@001 max dimension
 
@@ -28,12 +28,14 @@ def _get_model():
     """Lazily initialize Vertex AI and load the embedding model."""
     global _model
     if _model is None:
-        aiplatform.init(project=GCP_PROJECT, location=GCP_LOCATION)
-        _model = MultiModalEmbeddingModel.from_pretrained("multimodalembedding@001")
+        if not GCP_PROJECT:
+            raise ValueError("GCP_PROJECT_ID or GOOGLE_CLOUD_PROJECT environment variable not set.")
+        vertexai.init(project=GCP_PROJECT, location="us-central1")
+        _model = MultiModalEmbeddingModel.from_pretrained("multimodalembedding")
     return _model
 
 
-def generate_image_embedding(image_path: str) -> list[float] | None:
+def generate_image_embedding(image_path: str) -> list[float]:
     """
     Generate a vector embedding from a product image using Vertex AI.
 
@@ -41,37 +43,30 @@ def generate_image_embedding(image_path: str) -> list[float] | None:
         image_path: Absolute path to the image file on disk.
 
     Returns:
-        A list of floats (1408 dimensions) or None if embedding fails.
+        A list of floats (1408 dimensions). Raises Exception on failure.
     """
-    try:
-        filepath = Path(image_path)
-        if not filepath.exists():
-            print(f"[ERROR] Image file not found: {image_path}")
-            return None
+    filepath = Path(image_path)
+    if not filepath.exists():
+        raise FileNotFoundError(f"Image file not found: {image_path}")
 
-        # Load image directly from file path
-        image = VertexImage.load_from_file(str(filepath))
+    # Load image directly from file path
+    image = VertexImage.load_from_file(str(filepath))
 
-        # Get embedding — single API call, true visual embedding
-        embeddings = _get_model().get_embeddings(
-            image=image,
-            dimension=EMBEDDING_DIM,
-        )
+    # Get embedding — single API call, true visual embedding
+    embeddings = _get_model().get_embeddings(
+        image=image,
+        dimension=EMBEDDING_DIM,
+    )
 
-        embedding = embeddings.image_embedding
-        if not embedding:
-            print("[ERROR] Vertex AI returned empty image embedding")
-            return None
+    embedding = embeddings.image_embedding
+    if not embedding:
+        raise ValueError("Vertex AI returned empty image embedding")
 
-        print(f"[OK] Generated image embedding ({len(embedding)} dims) for {filepath.name}")
-        return list(embedding)
-
-    except Exception as e:
-        print(f"[ERROR] Error generating image embedding: {e}")
-        return None
+    print(f"[OK] Generated image embedding ({len(embedding)} dims) for {filepath.name}")
+    return list(embedding)
 
 
-def generate_text_embedding(text: str) -> list[float] | None:
+def generate_text_embedding(text: str) -> list[float]:
     """
     Generate a text embedding in the same vector space as image embeddings.
     This enables cross-modal search: text queries match image vectors.
@@ -80,21 +75,15 @@ def generate_text_embedding(text: str) -> list[float] | None:
         text: Text description to embed (e.g. "red sneakers").
 
     Returns:
-        A list of floats (1408 dimensions) or None if embedding fails.
+        A list of floats (1408 dimensions). Raises Exception on failure.
     """
-    try:
-        embeddings = _get_model().get_embeddings(
-            contextual_text=text,
-            dimension=EMBEDDING_DIM,
-        )
+    embeddings = _get_model().get_embeddings(
+        contextual_text=text,
+        dimension=EMBEDDING_DIM,
+    )
 
-        embedding = embeddings.text_embedding
-        if not embedding:
-            print("[ERROR] Vertex AI returned empty text embedding")
-            return None
+    embedding = embeddings.text_embedding
+    if not embedding:
+        raise ValueError("Vertex AI returned empty text embedding")
 
-        return list(embedding)
-
-    except Exception as e:
-        print(f"[ERROR] Error generating text embedding: {e}")
-        return None
+    return list(embedding)

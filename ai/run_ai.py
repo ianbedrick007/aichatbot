@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from ai.prompts import system_prompt
-from ai.tools import get_weather, get_exchange_rate, get_products, tools, get_rate, search_similar_products
+from ai.tools import get_weather, get_exchange_rate, get_products, tools, get_rate, search_similar_products, search_by_image
 from models import Message, Business
 from payment.payment import initialize_payment, verify_payment
 
@@ -83,7 +83,7 @@ def call_function(function_name, db, **kwargs):
     return available_functions[function_name](**kwargs)
 
 
-def get_ai_response(user_input, db, conversation_history=None, business_id=None, user_name=None, image_data=None):
+def get_ai_response(user_input, db, conversation_history=None, business_id=None, user_name=None, image_data=None, image_url=None):
     """
     Get AI response with conversation context and tool calling.
 
@@ -139,7 +139,7 @@ def get_ai_response(user_input, db, conversation_history=None, business_id=None,
                 {
                     "type": "image_url",
                     "image_url": {
-                        "url": f"data:image/jpeg;base64,{image_data}"
+                        "url": image_url
                     }
                 }
             ]

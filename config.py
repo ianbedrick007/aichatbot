@@ -1,9 +1,15 @@
+import os
+
 from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=".env" if os.path.exists(".env") else None,
+        env_file_encoding="utf-8",
+        extra="ignore"
+    )
 
     secret_key: SecretStr = SecretStr("default-insecure-secret-key-change-me")
     algorithm: str = "HS256"

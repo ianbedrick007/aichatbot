@@ -389,7 +389,18 @@
     async function loadCustomers() {
         try {
             const response = await fetch('/api/customers');
+            
+            if (response.status === 401) {
+                window.location.href = '/login';
+                return;
+            }
+            
             const data = await response.json();
+
+            // Check if data.customers exists before accessing length
+            if (!data.customers) {
+                throw new Error(data.detail || "Failed to load customers");
+            }
 
             const customerList = document.getElementById('customerList');
 
@@ -472,6 +483,12 @@
     async function loadMessages(customerName) {
         try {
             const response = await fetch(`/api/customer-messages/${encodeURIComponent(customerName)}`);
+            
+            if (response.status === 401) {
+                window.location.href = '/login';
+                return;
+            }
+            
             const data = await response.json();
 
             const messagesContainer = document.getElementById('conversationMessages');

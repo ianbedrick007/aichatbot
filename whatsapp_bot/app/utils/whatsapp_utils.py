@@ -172,7 +172,7 @@ def process_whatsapp_message(body, db: Session):
         response = "History refreshed. How can I help you today?"
     else:
         response = get_ai_response(message_body, db, conversation_history, business_id=business.id, user_name=name,
-                                   image_data=image_data)
+                                   image_data=image_data, image_url=media_url)
 
     # ✅ Save bot response to database
     update_conversation_history(

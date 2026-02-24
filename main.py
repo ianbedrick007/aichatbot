@@ -1,4 +1,3 @@
-
 # Import necessary libraries and modules
 import os
 from contextlib import asynccontextmanager
@@ -10,7 +9,6 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -21,7 +19,7 @@ from ai.run_ai import get_ai_response, update_conversation_history, get_conversa
 from auth import create_access_token
 from database import get_db, engine, get_current_user
 from models import Business, User, Base, Product
-from routers import products, users
+from routers import products, users, conversations
 from whatsapp_bot.app import router as whatsapp_router, configure_logging
 
 
@@ -66,6 +64,8 @@ templates = Jinja2Templates(directory="templates")
 app.include_router(users.router, prefix="/api/users", tags=["users"])
 app.include_router(products.router, prefix="", tags=["posts"])
 app.include_router(whatsapp_router, prefix="/api/whatsapp", tags=["whatsapp"])
+
+app.include_router(conversations.router)
 
 
 # Define routes and their handlers
@@ -168,8 +168,6 @@ async def chat_post(
     return RedirectResponse(url="/chat", status_code=303)
 
 
-
-
 @app.get("/conversations", name="conversations")
 def conversations_page(
         request: Request,
@@ -268,7 +266,7 @@ async def login_post(
         key="access_token",
         value=access_token,
         httponly=True,  # JS cannot read it
-        secure=True,  # only sent over HTTPS
+        secure=True,  # Set to True only in production (HTTPS)
         samesite="lax",  # safe default
         max_age=3600  # 1 hour
     )
@@ -300,7 +298,7 @@ def signup_page(request: Request):
 @app.post("/signup")
 async def signup_post(request: Request, db: Annotated[Session, Depends(get_db)]):
     """
-    Handle the user registration process.
+    Handle the user registration process
 
     Args:
         request (Request): The HTTP request object containing form data.

@@ -1,12 +1,14 @@
+import base64
 import os
+import tempfile
 
 import requests
 from dotenv import load_dotenv
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ai.image_embeddings import generate_text_embedding, generate_image_embedding
 from models import Product
-from ai.image_embeddings import generate_text_embedding
 
 load_dotenv()
 
@@ -171,6 +173,29 @@ tools = [
                 "additionalProperties": False
             }
         }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "search_by_image",
+            "description": "Search for products similar to an image by generating an image embedding from a provided image URL. Use when a customer uploads or shares an image and wants to find visually similar products.",
+            "strict": True,
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "image_url": {
+                        "type": "string",
+                        "description": "Publicly accessible URL of the image to search with"
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Maximum number of results to return (default 5)"
+                    }
+                },
+                "required": ["image_url", "limit"],
+                "additionalProperties": False
+            }
+        }
     }
 
 ]
@@ -265,7 +290,7 @@ def get_rate(pair, side, amount_crypto, amount_fiat):
         return {"error": str(e)}
 
 
-def search_similar_products(query: str, limit: int, db: Session = None, business_id: int = None):
+def search_similar_products(query: str, limit: int = 5, db: Session = None, business_id: int = None):
     """
     Search for products similar to a text description using vector embeddings.
     """
@@ -274,9 +299,10 @@ def search_similar_products(query: str, limit: int, db: Session = None, business
             return {"error": "Database session and business ID required"}
 
         # Generate embedding from query text
-        query_embedding = generate_text_embedding(query)
-        if not query_embedding:
-            return {"error": "Could not generate search embedding"}
+        try:
+            query_embedding = generate_text_embedding(query)
+        except Exception as e:
+            return {"error": f"Failed to generate text embedding: {str(e)}"}
 
         # Query using pgvector cosine distance
         results = db.query(Product).filter(
@@ -289,6 +315,44 @@ def search_similar_products(query: str, limit: int, db: Session = None, business
         if not results:
             return {"message": "No products with image embeddings found. Try uploading product images first."}
 
+        return [
+            {
+                "id": p.id,
+                "name": p.name,
+                "description": p.description,
+                "price": p.price,
+                "image_url": p.image_url
+            }
+            for p in results
+        ]
+    except Exception as e:
+        return {"error": str(e)}
+
+
+def search_by_image(image_url: str, limit: int = 5, db: Session = None, business_id: int = None):
+    try:
+        if not db or not business_id:
+            return {"error": "Database session and business ID required"}
+
+        try:
+            print(f"Generating image embedding for URL: {image_url}")
+            query_embedding = generate_image_embedding(image_url)
+        except Exception as e:
+            return {"error": f"Failed to generate image embedding: {str(e)}"}
+
+        # Query using pgvector cosine distance
+        print(f"Searching for similar products in business {business_id}...")
+        results = db.query(Product).filter(
+            Product.business_id == business_id,
+            Product.image_embedding.isnot(None)
+        ).order_by(
+            Product.image_embedding.cosine_distance(query_embedding)
+        ).limit(limit or 5).all()
+
+        if not results:
+            return {"message": "No products with image embeddings found. Try uploading product images first."}
+
+        print(f"Found {len(results)} similar products.")
         return [
             {
                 "id": p.id,

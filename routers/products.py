@@ -99,9 +99,11 @@ def add_product(
         image_url = f"/media/products/{filename}"
 
         # Generate vector embedding from the image
-        embedding = generate_image_embedding(filepath)
-        if embedding:
+        try:
+            embedding = generate_image_embedding(filepath)
             image_embedding = embedding
+        except Exception as e:
+            print(f"[WARNING] Failed to generate embedding for new product: {e}")
 
     new_product = Product(
         name=name,
@@ -159,9 +161,11 @@ async def update_product_image(
     product.image_url = f"/media/products/{filename}"
 
     # Generate new embedding
-    embedding = generate_image_embedding(filepath)
-    if embedding:
+    try:
+        embedding = generate_image_embedding(filepath)
         product.image_embedding = embedding
+    except Exception as e:
+        print(f"[WARNING] Failed to generate embedding for updated image: {e}")
 
     db.commit()
     db.refresh(product)
