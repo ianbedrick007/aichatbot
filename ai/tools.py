@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ai.image_embeddings import generate_text_embedding, generate_image_embedding
+from ai.image_embeddings import generate_text_embedding, generate_image_embedding, generate_image_embedding_from_base64
 from models import Product
 
 load_dotenv()
@@ -329,16 +329,26 @@ def search_similar_products(query: str, limit: int = 5, db: Session = None, busi
         return {"error": str(e)}
 
 
-def search_by_image(image_url: str, limit: int = 5, db: Session = None, business_id: int = None):
+def search_by_image(image_url: str = None, image_data: str = None,
+                    limit: int = 5, db: Session = None, business_id: int = None):
     try:
         if not db or not business_id:
             return {"error": "Database session and business ID required"}
 
         try:
-            print(f"Generating image embedding for URL: {image_url}")
-            query_embedding = generate_image_embedding(image_url)
+            if image_data:
+                # Use base64 data directly — no network call needed
+                print("Generating image embedding from base64 data...")
+                query_embedding = generate_image_embedding_from_base64(image_data)
+            elif image_url:
+                print(f"Generating image embedding for URL: {image_url}")
+                query_embedding = generate_image_embedding(image_url)
+            else:
+                return {"error": "Either image_url or image_data is required"}
         except Exception as e:
             return {"error": f"Failed to generate image embedding: {str(e)}"}
+
+        # ... rest unchanged
 
         # Query using pgvector cosine distance
         print(f"Searching for similar products in business {business_id}...")

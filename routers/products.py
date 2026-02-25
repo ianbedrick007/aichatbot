@@ -1,4 +1,5 @@
 from typing import Annotated
+from datetime import datetime, timezone
 import os
 import uuid
 
@@ -111,7 +112,8 @@ def add_product(
         description=description,
         image_url=image_url,
         image_embedding=image_embedding,
-        business_id=business.id
+        business_id=business.id,
+        created_at=datetime.now(timezone.utc)
     )
     db.add(new_product)
     db.commit()

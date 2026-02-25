@@ -1,6 +1,7 @@
 import base64
 import logging
 import re
+import time
 
 import requests
 from sqlalchemy.orm import Session
@@ -11,6 +12,9 @@ from ..config import whatsapp_settings
 
 # Global set to store users who have AI disabled
 AI_DISABLED_USERS = set()
+
+# Global cache to store processed message IDs for deduplication
+PROCESSED_MESSAGE_IDS = {}
 
 
 def toggle_ai_status(wa_id: str, enable: bool):
@@ -108,9 +112,25 @@ def process_whatsapp_message(body, db: Session):
     name = contact.get("profile", {}).get("name", wa_id)  # Fallback to ID if name missing
 
     message = body["entry"][0]["changes"][0]["value"]["messages"][0]
+    message_id = message.get("id")
+
+    # Deduplication: Check if message_id was already processed
+    if message_id:
+        current_time = time.time()
+        # Cleanup: Remove IDs older than 5 minutes (300 seconds)
+        for mid in list(PROCESSED_MESSAGE_IDS.keys()):
+            if current_time - PROCESSED_MESSAGE_IDS[mid] > 300:
+                del PROCESSED_MESSAGE_IDS[mid]
+
+        if message_id in PROCESSED_MESSAGE_IDS:
+            logging.info(f"Skipping duplicate message ID: {message_id}")
+            return
+        PROCESSED_MESSAGE_IDS[message_id] = current_time
+
     message_type = message.get("type")
 
     image_data = None
+    media_url = None
     message_body = ""
 
     if message_type == "text":

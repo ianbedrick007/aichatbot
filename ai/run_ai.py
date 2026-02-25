@@ -1,5 +1,6 @@
 import json
 import os
+import contextvars
 import traceback
 
 from dotenv import load_dotenv
@@ -8,7 +9,8 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from ai.prompts import system_prompt
-from ai.tools import get_weather, get_exchange_rate, get_products, tools, get_rate, search_similar_products, search_by_image
+from ai.tools import get_weather, get_exchange_rate, get_products, tools, get_rate, search_similar_products, \
+    search_by_image
 from models import Message, Business
 from payment.payment import initialize_payment, verify_payment
 
@@ -30,19 +32,31 @@ def _get_client():
         )
     return _client
 
+
 # ✅ Store business_id as a context variable
-_current_business_id = None
+_current_business_id = contextvars.ContextVar("current_business_id", default=None)
 
 
 def set_business_context(business_id):
     """Set the business context for the current request"""
-    global _current_business_id
-    _current_business_id = business_id
+    _current_business_id.set(business_id)
 
 
 def get_business_context():
     """Get the current business context"""
-    return _current_business_id
+    return _current_business_id.get()
+
+
+# Add a module-level variable alongside _current_business_id
+_current_image_data = contextvars.ContextVar("current_image_data", default=None)  # base64 string
+
+
+def set_image_context(image_data):
+    _current_image_data.set(image_data)
+
+
+def get_image_context():
+    return _current_image_data.get()
 
 
 available_functions = {
@@ -66,24 +80,29 @@ class WeatherResponse(BaseModel):
 def call_function(function_name, db, **kwargs):
     """Call a function, injecting business_id if needed"""
     # ✅ Inject business_id for get_products
-    if function_name == "get_products" and _current_business_id:
+    if function_name == "get_products" and get_business_context():
         kwargs['db'] = db
-        kwargs['business_id'] = _current_business_id
+        kwargs['business_id'] = get_business_context()
     # ✅ Inject db and business_id for search_similar_products
-    if function_name == "search_similar_products" and _current_business_id:
+    if function_name == "search_similar_products" and get_business_context():
         kwargs['db'] = db
-        kwargs['business_id'] = _current_business_id
+        kwargs['business_id'] = get_business_context()
     if function_name == "initialize_payment" and 'callback_url' not in kwargs:
         # Inject the default callback URL if not provided by the AI
         kwargs['callback_url'] = f"{os.getenv('AI_BASE_URL')}/paystack/callback"
-    if function_name == "search_by_image" and _current_business_id:
+    if function_name == "search_by_image" and get_business_context():
         kwargs['db'] = db
-        kwargs['business_id'] = _current_business_id
+        kwargs['business_id'] = get_business_context()
+        # Use the actual downloaded image data instead of whatever URL the AI invented
+        if get_image_context():
+            kwargs['image_data'] = get_image_context()
+            kwargs.pop('image_url', None)  # remove hallucinated URL
 
     return available_functions[function_name](**kwargs)
 
 
-def get_ai_response(user_input, db, conversation_history=None, business_id=None, user_name=None, image_data=None, image_url=None):
+def get_ai_response(user_input, db, conversation_history=None, business_id=None, user_name=None, image_data=None,
+                    image_url=None):
     """
     Get AI response with conversation context and tool calling.
 
@@ -98,6 +117,10 @@ def get_ai_response(user_input, db, conversation_history=None, business_id=None,
     # ✅ Set business context for this request
     if business_id:
         set_business_context(business_id)
+    if image_data:
+        set_image_context(image_data)  # ← add this
+    else:
+        set_image_context(None)  # ← clear it if no image
 
     # 1. Build base messages
     messages = [
@@ -139,7 +162,7 @@ def get_ai_response(user_input, db, conversation_history=None, business_id=None,
                 {
                     "type": "image_url",
                     "image_url": {
-                        "url": image_url
+                        "url": f"data:image/jpeg;base64,{image_data}"
                     }
                 }
             ]
@@ -147,7 +170,20 @@ def get_ai_response(user_input, db, conversation_history=None, business_id=None,
     else:
         messages.append({"role": "user", "content": user_input})
 
-    print(f"Messages: {messages}")
+    # Log messages safely (truncate base64 images)
+    messages_log = []
+    for msg in messages:
+        if isinstance(msg.get("content"), list):
+            # Create a copy to avoid modifying the actual payload
+            msg_copy = msg.copy()
+            msg_copy["content"] = [
+                {"type": "image_url", "url": "TRUNCATED_BASE64"} if item.get("type") == "image_url" else item
+                for item in msg["content"]
+            ]
+            messages_log.append(msg_copy)
+        else:
+            messages_log.append(msg)
+    print(f"Messages: {messages_log}")
 
     try:
         # 2. First model call

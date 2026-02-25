@@ -66,6 +66,23 @@ def generate_image_embedding(image_path: str) -> list[float]:
     return list(embedding)
 
 
+def generate_image_embedding_from_base64(base64_data: str) -> list[float]:
+    """Generate embedding from base64 image string (e.g. from WhatsApp download)."""
+    import base64, tempfile
+
+    image_bytes = base64.b64decode(base64_data)
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
+        tmp.write(image_bytes)
+        tmp_path = tmp.name
+
+    try:
+        return generate_image_embedding(tmp_path)
+    finally:
+        import os
+        os.unlink(tmp_path)  # clean up temp file
+
+
 def generate_text_embedding(text: str) -> list[float]:
     """
     Generate a text embedding in the same vector space as image embeddings.

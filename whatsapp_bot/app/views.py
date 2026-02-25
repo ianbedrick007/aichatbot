@@ -2,7 +2,7 @@ import json
 import logging
 import os
 
-from fastapi import APIRouter, Request, Depends, HTTPException, status
+from fastapi import APIRouter, Request, Depends, HTTPException, status, BackgroundTasks
 from fastapi.responses import JSONResponse, PlainTextResponse
 from sqlalchemy.orm import Session
 
@@ -21,6 +21,7 @@ VERIFY_TOKEN = os.getenv("VERIFY_TOKEN")
 @router.post("/webhook", tags=["WhatsApp"])
 async def webhook_post(
         request: Request,
+        background_tasks: BackgroundTasks,
         db: Session = Depends(get_db),
         _: None = Depends(signature_required)
 ):
@@ -57,7 +58,7 @@ async def webhook_post(
 
     # Handle actual incoming messages
     if is_valid_whatsapp_message(body):
-        process_whatsapp_message(body, db)
+        background_tasks.add_task(process_whatsapp_message, body, db)
         return JSONResponse({"status": "ok"}, status_code=200)
 
     # Not a valid WhatsApp event
