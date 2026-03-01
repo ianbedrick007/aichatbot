@@ -44,18 +44,26 @@ document.addEventListener('DOMContentLoaded', function() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ message })
             });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.detail || `Server error: ${response.status}`);
+            }
+
             const data = await response.json();
 
             // Hide thinking bubble
             if (thinkingBubble) thinkingBubble.style.display = 'none';
 
             // Add bot response
-            appendMessage(data.response, 'bot');
+            if (data.response && data.response.trim()) {
+                appendMessage(data.response, 'bot');
+            }
 
         } catch (error) {
             console.error('Error:', error);
             if (thinkingBubble) thinkingBubble.style.display = 'none';
-            appendMessage("Sorry, something went wrong. Please try again.", 'bot');
+            appendMessage(error.message || "Sorry, something went wrong.", 'bot');
         }
     });
 

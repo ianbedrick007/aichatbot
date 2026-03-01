@@ -3,12 +3,14 @@ import logging
 import re
 import time
 
-import requests
-from sqlalchemy.orm import Session
-
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
+from sqlalchemy.orm import DeclarativeBase, selectinload
+import httpx
 from ai.run_ai import get_ai_response, get_conversation_history, update_conversation_history, clear_conversation_history
 from models import Business
 from ..config import whatsapp_settings
+from whatsapp_bot.utils import send_typing_indicator
 
 # Global set to store users who have AI disabled
 AI_DISABLED_USERS = set()
@@ -46,22 +48,27 @@ def generate_response(response):
     return response.upper()
 
 
-def send_message(data: dict):
+async def send_message(data: dict, phone_number_id: str = None, access_token: str = None):
     """Send a message via WhatsApp Business API"""
-    url = f"https://graph.facebook.com/{whatsapp_settings.version}/{whatsapp_settings.phone_number_id}/messages"
+    # Use provided credentials or fallback to settings
+    phone_id = phone_number_id or whatsapp_settings.phone_number_id
+    token = access_token or whatsapp_settings.access_token.get_secret_value()
+
+    url = f"https://graph.facebook.com/{whatsapp_settings.version}/{phone_id}/messages"
 
     headers = {
         "Content-type": "application/json",
-        "Authorization": f"Bearer {whatsapp_settings.access_token.get_secret_value()}",
+        "Authorization": f"Bearer {token}",
     }
 
     try:
-        response = requests.post(url, json=data, headers=headers, timeout=10)
-        response.raise_for_status()
-    except requests.Timeout:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(url, json=data, headers=headers, timeout=10)
+            response.raise_for_status()
+    except httpx.TimeoutException:
         logging.error("Timeout occurred while sending message")
         return None
-    except requests.RequestException as e:
+    except httpx.RequestError as e:
         logging.error(f"Request failed: {e}")
         return None
 
@@ -79,28 +86,30 @@ def process_text_for_whatsapp(text: str):
     return text
 
 
-def get_media_url(media_id):
+async def get_media_url(media_id):
     """Get the URL for the media file from WhatsApp API"""
     url = f"https://graph.facebook.com/{whatsapp_settings.version}/{media_id}"
     headers = {
         "Authorization": f"Bearer {whatsapp_settings.access_token.get_secret_value()}",
     }
-    response = requests.get(url, headers=headers)
-    response.raise_for_status()
-    return response.json().get("url")
+    async with httpx.AsyncClient() as client:
+        response = await client.get(url, headers=headers)
+        response.raise_for_status()
+        return response.json().get("url")
 
 
-def download_media(media_url):
+async def download_media(media_url):
     """Download media file and return as base64 string"""
     headers = {
         "Authorization": f"Bearer {whatsapp_settings.access_token.get_secret_value()}",
     }
-    response = requests.get(media_url, headers=headers)
-    response.raise_for_status()
-    return base64.b64encode(response.content).decode("utf-8")
+    async with httpx.AsyncClient() as client:
+        response = await client.get(media_url, headers=headers)
+        response.raise_for_status()
+        return base64.b64encode(response.content).decode("utf-8")
 
 
-def process_whatsapp_message(body, db: Session):
+async def process_whatsapp_message(body, db: AsyncSession):
     """
     Process incoming WhatsApp message and link it to the correct business.
     """
@@ -138,8 +147,8 @@ def process_whatsapp_message(body, db: Session):
     elif message_type == "image":
         media_id = message["image"]["id"]
         try:
-            media_url = get_media_url(media_id)
-            image_data = download_media(media_url)
+            media_url = await get_media_url(media_id)
+            image_data = await download_media(media_url)
             # Use caption as text, or default prompt
             message_body = message["image"].get("caption") or "Please analyze this image."
         except Exception as e:
@@ -153,20 +162,24 @@ def process_whatsapp_message(body, db: Session):
     phone_number_id = body["entry"][0]["changes"][0]["value"]["metadata"]["phone_number_id"]
 
     # ✅ Find the business associated with this phone number
-    business = db.query(Business).filter(Business.phone_number_id == phone_number_id).first()
+    result = await db.execute(
+        select(Business)
+        .where(Business.phone_number_id == phone_number_id
+               ))
+    business = result.scalars().first()
 
     if not business:
         logging.error(f"No business found for phone_number_id: {phone_number_id}")
         # Send error message back to user
         error_response = "Sorry, this WhatsApp number is not configured for any business."
         data = get_text_message_input(wa_id, error_response)
-        send_message(data)
+        await send_message(data, phone_number_id=phone_number_id)
         return
 
     logging.info(f"Processing message for business: {business.name} (ID: {business.id})")
 
     # ✅ Save incoming user message to database
-    update_conversation_history(
+    await update_conversation_history(
         business_id=business.id,
         text=message_body,
         sender=wa_id,
@@ -183,19 +196,27 @@ def process_whatsapp_message(body, db: Session):
         return
 
     # ✅ Get recent messages for context (isolated by customer)
-    conversation_history = get_conversation_history(business.id, wa_id, db)
+    conversation_history = await get_conversation_history(business.id, wa_id,customer_name=None,db=db)
+
+    # ✅ Send typing indicator
+    # await send_typing_indicator(
+    #     recipient_id=wa_id,
+    #     business_phone_number_id=phone_number_id,
+    #     access_token=whatsapp_settings.access_token.get_secret_value()
+    # )
 
     # ✅ Get AI response with business context
     if message_body.lower() == "refresh":
-        clear_conversation_history(db, business_id=business.id, sender=name)
+        await clear_conversation_history(db, business_id=business.id, sender=name)
         conversation_history = []
         response = "History refreshed. How can I help you today?"
     else:
-        response = get_ai_response(message_body, db, conversation_history, business_id=business.id, user_name=name,
-                                   image_data=image_data, image_url=media_url)
+        response = await get_ai_response(message_body, db, conversation_history, business_id=business.id,
+                                         user_name=name,
+                                         image_data=image_data, image_url=media_url)
 
     # ✅ Save bot response to database
-    update_conversation_history(
+    await update_conversation_history(
         business_id=business.id,
         text=response,
         sender='bot',
@@ -211,7 +232,7 @@ def process_whatsapp_message(body, db: Session):
 
     # Send response back to user
     data = get_text_message_input(wa_id, response)
-    send_message(data)
+    await send_message(data, phone_number_id=phone_number_id)
 
 
 def is_valid_whatsapp_message(body):

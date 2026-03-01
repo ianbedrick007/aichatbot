@@ -1,11 +1,9 @@
-import base64
 import os
-import tempfile
 
 import requests
 from dotenv import load_dotenv
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai.image_embeddings import generate_text_embedding, generate_image_embedding, generate_image_embedding_from_base64
 from models import Product
@@ -239,7 +237,7 @@ def get_exchange_rate(local_currency, foreign_currency):
         return {"error": str(e)}
 
 
-def get_products(db: Session, business_id: int):
+async def get_products(db: AsyncSession, business_id: int):
     """
     Get the list of products for a business.
     """
@@ -247,7 +245,7 @@ def get_products(db: Session, business_id: int):
         if not business_id:
             return {"error": "Business ID is required"}
 
-        result = db.execute(select(Product).where(Product.business_id == business_id))
+        result = await db.execute(select(Product).where(Product.business_id == business_id))
         products = result.scalars().all()
 
         product_list = []
@@ -290,7 +288,7 @@ def get_rate(pair, side, amount_crypto, amount_fiat):
         return {"error": str(e)}
 
 
-def search_similar_products(query: str, limit: int = 5, db: Session = None, business_id: int = None):
+async def search_similar_products(query: str, limit: int = 5, db: AsyncSession = None, business_id: int = None):
     """
     Search for products similar to a text description using vector embeddings.
     """
@@ -305,14 +303,19 @@ def search_similar_products(query: str, limit: int = 5, db: Session = None, busi
             return {"error": f"Failed to generate text embedding: {str(e)}"}
 
         # Query using pgvector cosine distance
-        results = db.query(Product).filter(
-            Product.business_id == business_id,
-            Product.image_embedding.isnot(None)
-        ).order_by(
-            Product.image_embedding.cosine_distance(query_embedding)
-        ).limit(limit or 5).all()
+        result = await db.execute(
+            select(Product)
+            .where(
+                Product.business_id == business_id,
+                Product.image_embedding.isnot(None)
+            )
+            .order_by(Product.image_embedding.cosine_distance(query_embedding))
+            .limit(limit or 5)
+        )
 
-        if not results:
+        products = result.scalars().all()
+
+        if not products:
             return {"message": "No products with image embeddings found. Try uploading product images first."}
 
         return [
@@ -323,14 +326,14 @@ def search_similar_products(query: str, limit: int = 5, db: Session = None, busi
                 "price": p.price,
                 "image_url": p.image_url
             }
-            for p in results
+            for p in products
         ]
     except Exception as e:
         return {"error": str(e)}
 
 
-def search_by_image(image_url: str = None, image_data: str = None,
-                    limit: int = 5, db: Session = None, business_id: int = None):
+async def search_by_image(image_url: str = None, image_data: str = None,
+                          limit: int = 5, db: AsyncSession = None, business_id: int = None):
     try:
         if not db or not business_id:
             return {"error": "Database session and business ID required"}
@@ -352,12 +355,17 @@ def search_by_image(image_url: str = None, image_data: str = None,
 
         # Query using pgvector cosine distance
         print(f"Searching for similar products in business {business_id}...")
-        results = db.query(Product).filter(
-            Product.business_id == business_id,
-            Product.image_embedding.isnot(None)
-        ).order_by(
-            Product.image_embedding.cosine_distance(query_embedding)
-        ).limit(limit or 5).all()
+        result = await db.execute(
+            select(Product)
+            .where(
+                Product.business_id == business_id,
+                Product.image_embedding.isnot(None)
+            )
+            .order_by(Product.image_embedding.cosine_distance(query_embedding))
+            .limit(limit or 5)
+        )
+
+        results = result.scalars().all()
 
         if not results:
             return {"message": "No products with image embeddings found. Try uploading product images first."}

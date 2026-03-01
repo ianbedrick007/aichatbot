@@ -13,5 +13,6 @@ dependencies = [
     "requests>=2.32.5",
     "sqlalchemy>=2.0.46",
     "werkzeug>=3.1.5",
-    "uvicorn>=0.40.0"
+    "uvicorn>=0.40.0",
+    "asyncpg>=0.31.0",
 ]

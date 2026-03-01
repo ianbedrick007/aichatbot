@@ -1,12 +1,15 @@
+import contextvars
+import inspect
 import json
 import os
-import contextvars
 import traceback
 
 from dotenv import load_dotenv
-from openai import OpenAI
+from openai import AsyncOpenAI
 from pydantic import BaseModel, Field
-from sqlalchemy.orm import Session
+from sqlalchemy import delete
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai.prompts import system_prompt
 from ai.tools import get_weather, get_exchange_rate, get_products, tools, get_rate, search_similar_products, \
@@ -26,7 +29,7 @@ def _get_client():
     """Lazily initialize the OpenAI client to avoid crashing at import time."""
     global _client
     if _client is None:
-        _client = OpenAI(
+        _client = AsyncOpenAI(
             base_url="https://openrouter.ai/api/v1",
             api_key=api_key
         )
@@ -77,32 +80,37 @@ class WeatherResponse(BaseModel):
     response: str = Field(description="A natural language response to the user query.")
 
 
-def call_function(function_name, db, **kwargs):
+async def call_function(function_name, db, business_id=None, **kwargs):
     """Call a function, injecting business_id if needed"""
     # ✅ Inject business_id for get_products
-    if function_name == "get_products" and get_business_context():
+    if function_name == "get_products" and business_id:
         kwargs['db'] = db
-        kwargs['business_id'] = get_business_context()
+        kwargs['business_id'] = business_id
     # ✅ Inject db and business_id for search_similar_products
-    if function_name == "search_similar_products" and get_business_context():
+    if function_name == "search_similar_products" and business_id:
         kwargs['db'] = db
-        kwargs['business_id'] = get_business_context()
+        kwargs['business_id'] = business_id
     if function_name == "initialize_payment" and 'callback_url' not in kwargs:
         # Inject the default callback URL if not provided by the AI
         kwargs['callback_url'] = f"{os.getenv('AI_BASE_URL')}/paystack/callback"
-    if function_name == "search_by_image" and get_business_context():
+    if function_name == "search_by_image" and business_id:
         kwargs['db'] = db
-        kwargs['business_id'] = get_business_context()
+        kwargs['business_id'] = business_id
         # Use the actual downloaded image data instead of whatever URL the AI invented
         if get_image_context():
             kwargs['image_data'] = get_image_context()
             kwargs.pop('image_url', None)  # remove hallucinated URL
 
-    return available_functions[function_name](**kwargs)
+    func = available_functions[function_name]
+
+    if inspect.iscoroutinefunction(func):
+        return await func(**kwargs)
+    else:
+        return func(**kwargs)
 
 
-def get_ai_response(user_input, db, conversation_history=None, business_id=None, user_name=None, image_data=None,
-                    image_url=None):
+async def get_ai_response(user_input, db, conversation_history=None, business_id=None, user_name=None, image_data=None,
+                          image_url=None):
     """
     Get AI response with conversation context and tool calling.
 
@@ -126,7 +134,9 @@ def get_ai_response(user_input, db, conversation_history=None, business_id=None,
     messages = [
         {"role": "system", "content": system_prompt}
     ]
-    business_obj = db.query(Business).filter_by(id=business_id).first()
+
+    business_result = await db.execute(select(Business).filter_by(id=business_id))
+    business_obj = business_result.scalar_one_or_none()
     business_prompt = business_obj.persona if business_obj else None
     if business_prompt:
         messages.append({"role": "system", "content": business_prompt})
@@ -135,6 +145,12 @@ def get_ai_response(user_input, db, conversation_history=None, business_id=None,
     if user_name:
         messages.append({"role": "system", "content": f"The user's name is {user_name}."})
 
+    conversation_history = await get_conversation_history(
+        business_id=business_id,
+        customer_id=None,
+        customer_name=user_name,
+        db=db
+    )
     if conversation_history:
         for msg in conversation_history:
             role = "assistant" if msg["is_bot"] else "user"
@@ -187,7 +203,7 @@ def get_ai_response(user_input, db, conversation_history=None, business_id=None,
 
     try:
         # 2. First model call
-        completion = _get_client().chat.completions.create(
+        completion = await _get_client().chat.completions.create(
             model=ai_model,
             messages=messages,
             tools=tools,
@@ -208,8 +224,11 @@ def get_ai_response(user_input, db, conversation_history=None, business_id=None,
                 print(f"Calling: {function_name} with {function_args}")
 
                 # Execute the tool (business_id injected in call_function)
-                function_result = call_function(function_name, db=db, **function_args)
-                print(f"Result: {function_result}")
+                function_result = await call_function(function_name, db=db, business_id=business_id, **function_args)
+
+                # Log result safely (truncate if too long)
+                result_str = str(function_result)
+                print(f"Result: {result_str[:200]}..." if len(result_str) > 200 else f"Result: {result_str}")
 
                 # Append tool result
                 messages.append({
@@ -220,7 +239,7 @@ def get_ai_response(user_input, db, conversation_history=None, business_id=None,
                 })
 
             # 5. Second API call with all function results
-            second_completion = _get_client().chat.completions.create(
+            second_completion = await _get_client().chat.completions.create(
                 model=ai_model,
                 messages=messages,
                 tools=tools,
@@ -236,15 +255,21 @@ def get_ai_response(user_input, db, conversation_history=None, business_id=None,
         return "Sorry, I'm having trouble responding right now."
 
 
-def get_conversation_history(business_id, customer_id, db: Session, limit=20):
+async def get_conversation_history(business_id, customer_id: int | None, customer_name: str | None, db: AsyncSession,
+                                   limit=20):
     """Retrieve recent conversation history for a specific business and customer."""
+    from sqlalchemy import or_
+    results = await db.execute(
+        select(Message)
+        .filter(
+            Message.business_id == business_id,
+            or_(Message.customer_id == customer_id, Message.customer_name == customer_name)
+        )
+        .order_by(Message.timestamp.desc())
+        .limit(limit)
+    )
 
-    recent_messages = db.query(Message).filter_by(
-        business_id=business_id,
-        customer_id=customer_id
-    ).order_by(Message.timestamp.desc()) \
-        .limit(limit) \
-        .all()
+    recent_messages = results.scalars().all()
 
     return [
         {
@@ -257,8 +282,8 @@ def get_conversation_history(business_id, customer_id, db: Session, limit=20):
     ]
 
 
-def update_conversation_history(db, business_id, text, sender, customer_id=None, customer_name=None, is_bot=False,
-                                platform="web"):
+async def update_conversation_history(db, business_id, text, sender, customer_id=None, customer_name=None, is_bot=False,
+                                      platform="web"):
     """Save a message to the database with isolation support."""
     new_msg = Message(
         business_id=business_id,
@@ -270,11 +295,17 @@ def update_conversation_history(db, business_id, text, sender, customer_id=None,
         platform=platform
     )
     db.add(new_msg)
-    db.commit()
+    await db.commit()
     return new_msg
 
 
-def clear_conversation_history(db, business_id, sender):
+async def clear_conversation_history(db, business_id, sender):
     """Delete all messages associated with a specific business."""
-    db.query(Message).filter_by(business_id=business_id, sender=sender).delete()
-    db.commit()
+    results = await db.execute(
+        delete(Message).where(
+            Message.business_id == business_id,
+            Message.sender == sender
+        )
+    )
+    print(f"{results.rowcount} messages were deleted by {sender}")
+    await db.commit()

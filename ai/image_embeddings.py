@@ -79,7 +79,6 @@ def generate_image_embedding_from_base64(base64_data: str) -> list[float]:
     try:
         return generate_image_embedding(tmp_path)
     finally:
-        import os
         os.unlink(tmp_path)  # clean up temp file
 
 

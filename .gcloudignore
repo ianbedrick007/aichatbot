@@ -1,0 +1,24 @@
+# Python build artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environment
+.Python
+env/
+venv/
+.venv/
+
+# Database files - should not be in the container
+*.db
+*.sqlite3
+
+# IDE and editor configuration
+.idea/
+.vscode/
+
+# Git and cloud-specific ignores
+.git/
+.gitignore
+.gcloudignore

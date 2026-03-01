@@ -22,6 +22,11 @@
             </div>
         </div>
         <div class="header-right">
+            <form action="{{ url_for('clear_session') }}" method="post" class="inline-form" id="clearSessionForm">
+                <button type="submit" class="icon-btn" title="Clear Session">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </form>
             <a href="{{ url_for('conversations') }}" class="icon-btn" title="Conversations">
                 <i class="bi bi-chat-dots"></i>
             </a>
@@ -86,4 +91,11 @@
 
 {% block scripts %}
 <script src="{{ url_for('static', path='js/chat.js') }}"></script>
+<script>
+    document.getElementById('clearSessionForm').addEventListener('submit', function(e) {
+        if (!confirm('Are you sure you want to clear the chat history?')) {
+            e.preventDefault();
+        }
+    });
+</script>
 {% endblock %}

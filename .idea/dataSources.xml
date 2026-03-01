@@ -2,7 +2,7 @@
 <project version="4">
   <component name="DataSourceManagerImpl" format="xml" multifile-model="true">
     <data-source source="LOCAL" name="fastwebapp" uuid="4bb925f4-021d-4838-b1e6-792c1ab0cd62">
-      <driver-ref>sqlite.xerial</driver-ref>
+      <driver-ref>b65d74b7-938d-41db-b46c-813373ffc1d9</driver-ref>
       <synchronize>true</synchronize>
       <jdbc-driver>org.sqlite.JDBC</jdbc-driver>
       <jdbc-url>jdbc:sqlite:C:\Users\HP\PycharmProjects\fastwebapp\fastwebapp.db</jdbc-url>

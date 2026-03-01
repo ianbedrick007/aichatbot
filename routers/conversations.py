@@ -1,10 +1,13 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import select, func
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db, get_current_user
 from models import User, Message
+from ai.run_ai import update_conversation_history
+from whatsapp_bot.app.config import whatsapp_settings
+from whatsapp_bot.app.utils.whatsapp_utils import toggle_ai_status, get_text_message_input, send_message, AI_DISABLED_USERS
 
 router = APIRouter(tags=["Conversations"])
 
@@ -16,8 +19,8 @@ class ToggleAIRequest(BaseModel):
 
 
 @router.get("/api/customers")
-def get_customers(
-        db: Session = Depends(get_db),
+async def get_customers(
+        db: AsyncSession = Depends(get_db),
         current_user: User = Depends(get_current_user)
 ):
     business = current_user.business
@@ -60,7 +63,8 @@ def get_customers(
         .order_by(Message.timestamp.desc())
     )
 
-    results = db.execute(stmt).all()
+    result = await db.execute(stmt)
+    results = result.all()
 
     customers = []
     for row in results:
@@ -72,28 +76,29 @@ def get_customers(
             "last_message": msg.text,
             "last_timestamp": msg.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
             "message_count": count,
-            "ai_enabled": True  # Default to True as we don't have a Customer model yet
+            "ai_enabled": msg.customer_id not in AI_DISABLED_USERS
         })
 
     return {"customers": customers}
 
 
 @router.get("/api/customer-messages/{customer_id}")
-def get_customer_messages(
+async def get_customer_messages(
         customer_id: str,
-        db: Session = Depends(get_db),
+        db: AsyncSession = Depends(get_db),
         current_user: User = Depends(get_current_user)
 ):
     business = current_user.business
     if not business:
         return {"messages": []}
 
-    msgs = db.execute(
+    result = await db.execute(
         select(Message)
         .where(Message.business_id == business.id)
         .where(Message.customer_id == customer_id)
         .order_by(Message.timestamp)
-    ).scalars().all()
+    )
+    msgs = result.scalars().all()
 
     return {
         "messages": [
@@ -107,11 +112,37 @@ def get_customer_messages(
 
 
 @router.post("/api/toggle-ai")
-def toggle_ai(
+async def toggle_ai(
         request: ToggleAIRequest,
-        db: Session = Depends(get_db),
+        db: AsyncSession = Depends(get_db),
         current_user: User = Depends(get_current_user)
 ):
-    # Logic to toggle AI would go here.
-    # For now, we just acknowledge the request.
+    business = current_user.business
+    if not business:
+        raise HTTPException(status_code=400, detail="User has no business")
+
+    # Toggle AI status
+    toggle_ai_status(request.customer_id, request.enable_ai)
+
+    # If a message is provided, send it via WhatsApp
+    if request.message:
+        data = get_text_message_input(request.customer_id, request.message)
+        await send_message(
+            data,
+            phone_number_id=business.phone_number_id,
+            access_token=whatsapp_settings.access_token.get_secret_value()
+        )
+
+        # Save the manual message to conversation history
+        await update_conversation_history(
+            business_id=business.id,
+            text=request.message,
+            sender="agent",
+            customer_id=request.customer_id,
+            customer_name=request.customer_id,  # Fallback to ID if name is unknown
+            is_bot=True,
+            db=db,
+            platform="whatsapp"
+        )
+
     return {"status": "success", "ai_enabled": request.enable_ai}

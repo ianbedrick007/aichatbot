@@ -1,32 +1,26 @@
-# syntax=docker/dockerfile:1
-
+# Use an official Python 3.11 slim image as a parent image
 FROM python:3.11-slim
 
-# Optimize Python environment settings
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
-
+# Set the working directory in the container to /app
 WORKDIR /app
 
-# Create a non-privileged user
-ARG UID=10001
-RUN adduser --disabled-password --gecos "" --uid "${UID}" appuser
+# Install uv using pip. This is the recommended way to bootstrap uv.
+RUN pip install uv
 
-# Install dependencies
+# Copy the requirements file into the container at /app
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application source code
-COPY --chown=appuser:appuser . .
+# Install packages specified in requirements.txt using uv.
+# The --system flag installs them into the global site-packages, similar to pip.
+RUN uv pip install --system --no-cache -r requirements.txt
 
-# Ensure media directories exist (empty dirs aren't tracked by git)
-RUN mkdir -p /app/media/product_pics /app/media/products && chown -R appuser:appuser /app/media
+# Copy the rest of your application's source code into the container
+COPY . .
 
-# Use non-privileged user
-USER appuser
-
-# Expose application port
+# Make port 8080 available to the world outside this container.
+# Cloud Run uses the PORT environment variable, which defaults to 8080.
 EXPOSE 8080
 
-# Start the application
-CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8080} --proxy-headers --forwarded-allow-ips '*'"]
+# Run main.py when the container launches.
+# Your main.py is already configured to start uvicorn on the host and port specified by Cloud Run.
+CMD ["python", "main.py"]

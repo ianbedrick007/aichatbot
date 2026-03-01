@@ -6,7 +6,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, status, Form, UploadFile, File
 from fastapi.responses import RedirectResponse
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from PIL import Image
 
 from database import get_db, get_current_user
@@ -65,30 +65,33 @@ def save_upload_file(upload_file: UploadFile) -> str:
 
 
 @router.get("/api/v1/products/{business_id}", response_model=list[ProductResponse], tags=["Products"])
-def get_products(business_id: int, db: Session = Depends(get_db)):
-    products = db.execute(
-        select(Product).where(Product.business_id == business_id)).scalars().all()
+async def get_products(business_id: int, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(
+        select(Product).where(Product.business_id == business_id))
+    products = result.scalars().all()
     return products
 
 
 @router.post("/api/v1/products", tags=["Products"])
-def add_product(
+async def add_product(
         name: str = Form(...),
         price: float = Form(...),
         description: str = Form(None),
         image: UploadFile | None = File(None),
-        db: Session = Depends(get_db),
+        db: AsyncSession = Depends(get_db),
         current_user: User = Depends(get_current_user)
 ):
-    business = db.execute(
+    result = await db.execute(
         select(Business).where(Business.user_id == current_user.id)
-    ).scalar()
+    )
+    business = result.scalars().first()
 
     if not business:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Business not found")
 
-    if db.execute(
-            select(Product).where(Product.name == name, Product.business_id == business.id)).first():
+    existing = await db.execute(
+        select(Product).where(Product.name == name, Product.business_id == business.id))
+    if existing.scalars().first():
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Product already exists")
 
     # Handle image upload and embedding
@@ -113,17 +116,18 @@ def add_product(
         image_url=image_url,
         image_embedding=image_embedding,
         business_id=business.id,
-        created_at=datetime.now(timezone.utc)
+        created_at=datetime.now(timezone.utc).replace(tzinfo=None)
     )
     db.add(new_product)
-    db.commit()
-    db.refresh(new_product)
+    await db.commit()
+    await db.refresh(new_product)
     return RedirectResponse(url="/products", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.patch("/api/v1/products/{product_id}", response_model=ProductResponse, tags=["Products"])
-async def update_product(product_id: int, product: ProductUpdate, db: Session = Depends(get_db)):
-    existing_product = db.query(Product).filter(Product.id == product_id).first()
+async def update_product(product_id: int, product: ProductUpdate, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Product).where(Product.id == product_id))
+    existing_product = result.scalars().first()
 
     if not existing_product:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
@@ -135,8 +139,8 @@ async def update_product(product_id: int, product: ProductUpdate, db: Session = 
     if product.description:
         existing_product.description = product.description
 
-    db.commit()
-    db.refresh(existing_product)
+    await db.commit()
+    await db.refresh(existing_product)
     return existing_product
 
 
@@ -144,11 +148,12 @@ async def update_product(product_id: int, product: ProductUpdate, db: Session = 
 async def update_product_image(
         product_id: int,
         image: UploadFile = File(...),
-        db: Session = Depends(get_db),
+        db: AsyncSession = Depends(get_db),
         current_user: User = Depends(get_current_user)
 ):
     """Upload or replace a product's image and regenerate its embedding."""
-    product = db.query(Product).filter(Product.id == product_id).first()
+    result = await db.execute(select(Product).where(Product.id == product_id))
+    product = result.scalars().first()
     if not product:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
 
@@ -169,14 +174,15 @@ async def update_product_image(
     except Exception as e:
         print(f"[WARNING] Failed to generate embedding for updated image: {e}")
 
-    db.commit()
-    db.refresh(product)
+    await db.commit()
+    await db.refresh(product)
     return {"message": "Image updated", "image_url": product.image_url}
 
 
 @router.put("/api/v1/products/{product_id}", response_model=ProductResponse, tags=["Products"])
-def replace_product(product_id: int, product: ProductCreate, db: Annotated[Session, Depends(get_db)]):
-    db_product = db.query(Product).filter(Product.id == product_id).first()
+async def replace_product(product_id: int, product: ProductCreate, db: Annotated[AsyncSession, Depends(get_db)]):
+    result = await db.execute(select(Product).where(Product.id == product_id))
+    db_product = result.scalars().first()
     if not db_product:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
 
@@ -186,14 +192,15 @@ def replace_product(product_id: int, product: ProductCreate, db: Annotated[Sessi
     if product.business_id:
         db_product.business_id = product.business_id
 
-    db.commit()
-    db.refresh(db_product)
+    await db.commit()
+    await db.refresh(db_product)
     return db_product
 
 
 @router.delete("/api/v1/products/{product_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["Products"])
-def delete_product(product_id: int, db: Session = Depends(get_db)):
-    product = db.query(Product).filter(Product.id == product_id).first()
+async def delete_product(product_id: int, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Product).where(Product.id == product_id))
+    product = result.scalars().first()
     if not product:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
 
@@ -203,5 +210,5 @@ def delete_product(product_id: int, db: Session = Depends(get_db)):
         if os.path.exists(image_path):
             os.remove(image_path)
 
-    db.delete(product)
-    db.commit()
+    await db.delete(product)
+    await db.commit()

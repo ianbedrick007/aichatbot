@@ -1,8 +1,10 @@
 from __future__ import annotations
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, Float, BigInteger, Boolean, func, text
-from sqlalchemy.orm import Mapped, mapped_column, relationship, DeclarativeBase
-from pgvector.sqlalchemy import Vector
+
 from datetime import datetime
+
+from pgvector.sqlalchemy import Vector
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, Float, Boolean, func, text
+from sqlalchemy.orm import Mapped, mapped_column, relationship, DeclarativeBase
 from werkzeug.security import generate_password_hash, check_password_hash
 
 
@@ -66,11 +68,11 @@ class Message(Base):
     # ✅ Messages belong to the business
     business_id: Mapped[int] = mapped_column(Integer, ForeignKey('businesses.id'), nullable=False)
     platform: Mapped[str] = mapped_column(String(20), default='web', nullable=False)
-    
+
     # Track the specific conversation
     customer_id: Mapped[str | None] = mapped_column(String(120), nullable=True, index=True)
     customer_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
-    
+
     text: Mapped[str] = mapped_column(Text, nullable=True)
     sender: Mapped[str] = mapped_column(String(120), nullable=False)  # 'wa_id' or 'bot' or 'user'
     is_bot: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
