@@ -1,0 +1,91 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-font-smoothing: initial;
+    -moz-osx-font-smoothing: initial;
+}
+
+body {
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    font-size: 14px;
+    line-height: 1.5;
+    background-color: var(--bg-app);
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    color: var(--text-primary);
+    line-height: 1.1;
+    text-transform: uppercase;
+}
+
+h1 {
+    font-size: 2rem;
+}
+
+h2 {
+    font-size: 1.5rem;
+}
+
+h3 {
+    font-size: 1.25rem;
+}
+
+a {
+    transition: var(--transition-fast);
+    color: var(--base-black);
+    text-decoration: underline;
+    font-weight: 700;
+}
+
+a:hover {
+    color: var(--teal-primary);
+}
+
+img {
+    max-width: 100%;
+    height: auto;
+    border: 2px solid var(--base-black);
+}
+
+/* Custom Scrollbar - Brutalist */
+::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--base-white);
+    border-left: 2px solid var(--base-black);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--base-black);
+    border-radius: 0;
+    border: 1px solid var(--base-white);
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--teal-primary);
+}
+
+/* Utils */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+}

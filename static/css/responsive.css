@@ -1,0 +1,179 @@
+/* Mobile Enhancements for Dashboard Layout */
+
+@media (max-width: 1024px) {
+    .sidebar {
+        transform: translateX(-100%);
+        box-shadow: 4px 0 10px rgba(0,0,0,0.1);
+    }
+
+    .sidebar.sidebar-visible {
+        transform: translateX(0);
+    }
+
+    .app-shell {
+        margin-left: 0;
+    }
+
+    #menu-btn {
+        display: block;
+    }
+
+    .topbar {
+        padding: 0 var(--space-4);
+    }
+
+    .page-content {
+        padding: var(--space-4);
+    }
+}
+
+@media (max-width: 768px) {
+    .topbar-search {
+        display: none; /* Hide search on smaller screens */
+    }
+
+    .topbar-actions .btn {
+        display: none; /* Hide upgrade button */
+    }
+
+    .page-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--space-4);
+    }
+
+    .table-container {
+        overflow-x: auto; /* Allow table to scroll horizontally */
+    }
+
+    .table {
+        min-width: 600px; /* Force a minimum width for the table */
+    }
+
+    .modal-content {
+        width: 90%;
+        margin: 0 auto;
+    }
+
+    .grid-cols-2,
+    .grid-cols-3 {
+        grid-template-columns: 1fr !important;
+    }
+}
+
+/* Mobile Enhancements for Minimal Layout */
+
+@media (max-width: 768px) {
+
+    /* Typographic & Spacing Overrides */
+    .hero h1 {
+        font-size: 2.8rem !important;
+        margin-bottom: 2rem !important;
+    }
+
+    .section-header h2,
+    #studio h2,
+    #pricing h2,
+    #waitlist h2 {
+        font-size: 2.2rem !important;
+    }
+
+    .section {
+        padding: 6rem 0 !important;
+    }
+
+    .hero.section {
+        padding: 10rem 0 4rem !important;
+        min-height: auto !important;
+    }
+
+    #studio p {
+        font-size: 1.15rem !important;
+    }
+
+    /* Navigation */
+    .desktop-nav {
+        display: none !important;
+    }
+
+    .nav-actions {
+        display: none !important;
+    }
+
+    /* Scrolled Nav needs to horizontally scroll on very small screens */
+    .scrolled-nav-container {
+        width: 95%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        justify-content: center;
+        padding: 0.5rem;
+        /* hide scrollbar for cleaner look */
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+    }
+
+    .scrolled-nav-container::-webkit-scrollbar {
+        display: none;
+    }
+
+    .scrolled-nav .nav-item {
+        white-space: nowrap;
+        padding: 0.5rem 1rem;
+        font-size: 0.8rem;
+    }
+
+    /* Grid Adjustments */
+    .grid-3 {
+        grid-template-columns: 1fr;
+        gap: 1.5rem !important;
+    }
+
+    /* Card Adjustments */
+    .card.premium-card {
+        padding: 2.5rem 1.5rem !important;
+    }
+
+    /* Pricing Pro Card override */
+    .pro-card {
+        transform: scale(1) !important;
+        margin: 1rem 0;
+    }
+
+    .pro-card:hover {
+        transform: scale(1) translateY(-4px) !important;
+    }
+
+    /* Waitlist Input Adjustments */
+    #waitlist form {
+        flex-direction: column;
+    }
+
+    #waitlist form button {
+        position: static !important;
+        padding: 1rem !important;
+        margin-top: 0.5rem;
+        width: 100%;
+    }
+
+    .footer-minimal-container {
+        flex-direction: column;
+        gap: 1.5rem;
+        text-align: center;
+    }
+
+    #menu-btn {
+        display: inline-block !important;
+    }
+
+    .message {
+        max-width: 95%;
+    }
+
+    .metrics-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .grid-3>div {
+        grid-column: span 1 !important;
+    }
+}

@@ -1,101 +1,127 @@
 {% extends "base.html" %}
 
-{% block title %}Chat - AI Chatbot{% endblock %}
+{% block title %}AI Testing Console | OmniLabs{% endblock %}
 
-{% block body_class %}chat-body{% endblock %}
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', path='css/chat_v2.css') }}">
+{% endblock %}
 
 {% block content %}
-<div class="chat-wrapper">
-    <!-- Glass Header -->
-    <header class="chat-header-glass">
-        <div class="header-left">
-            <div class="avatar-circle">
-                <img src="{{ url_for('static', path='assets/omni-face.png') }}" alt="Omni Ai"
-                    style="width: 32px; height: 32px; object-fit: contain;">
-            </div>
-            <div class="header-info">
-                <h1 class="header-title">Omni Ai</h1>
-                <div class="status-indicator">
-                    <span class="status-dot"></span>
-                    <span class="status-text">Online</span>
-                </div>
-            </div>
-        </div>
-        <div class="header-right">
-            <form action="{{ url_for('clear_session') }}" method="post" class="inline-form" id="clearSessionForm">
-                <button type="submit" class="icon-btn" title="Clear Session">
-                    <i class="bi bi-trash"></i>
-                </button>
-            </form>
-            <a href="{{ url_for('conversations') }}" class="icon-btn" title="Conversations">
-                <i class="bi bi-chat-dots"></i>
-            </a>
-            <a href="{{ url_for('products') }}" class="icon-btn" title="Marketplace">
-                <i class="bi bi-shop"></i>
-            </a>
-            <a href="{{ url_for('settings') }}" class="icon-btn" title="Settings">
-                <i class="bi bi-gear"></i>
-            </a>
-            <form action="{{ url_for('logout') }}" method="get" class="inline-form">
-                <button type="submit" class="icon-btn" title="Logout">
-                    <i class="bi bi-box-arrow-right"></i>
-                </button>
-            </form>
+<div class="chat-container-v2">
+    <header class="chat-v2-header">
+        <h2>
+            <i data-lucide="bot" class="icon-sm text-brand"></i> OMNILABS AI CONSOLE
+        </h2>
+        <div class="d-flex align-center gap-4">
+            <button class="btn btn-sm btn-outline text-error" onclick="clearSession()">
+                <i data-lucide="trash-2" class="icon-sm"></i> CLEAR CONSOLE
+            </button>
         </div>
     </header>
 
-    <!-- Chat Messages Area -->
-    <div class="chat-messages-glass" id="chatMessages">
-        {% if not messages %}
-        <div class="empty-state-glass">
-            <i class="bi bi-chat-square-text" style="font-size: 48px; opacity: 0.5;"></i>
-            <p class="empty-text">Start a conversation with your AI assistant</p>
+    <main class="chat-v2-messages" id="chat-messages">
+        <div class="text-center p-12 opacity-30 mt-12" id="chat-empty-state">
+            <i data-lucide="bot" class="icon-lg mb-4 d-inline-block"></i>
+            <p class="font-bold uppercase tracking-widest text-xs">OMNI SYSTEM INITIALIZED</p>
+            <p class="text-xs mt-2 uppercase">Awaiting operator input...</p>
         </div>
-        {% else %}
-        {% for message in messages %}
-        <div class="message-item {{ 'message-user' if message.role == 'user' else 'message-bot' }}">
-            <div class="message-bubble-glass">
-                <p class="message-text">{{ message.content }}</p>
-                <span class="message-time">{{ message.timestamp }}</span>
-            </div>
-        </div>
-        {% endfor %}
-        {% endif %}
+    </main>
 
-        <!-- Thinking Bubble (Hidden by default) -->
-        <div class="message-item message-bot thinking-bubble" id="thinkingBubble" style="display: none;">
-            <div class="message-bubble-glass">
-                <div class="thinking-dots">
-                    <div class="thinking-dot"></div>
-                    <div class="thinking-dot"></div>
-                    <div class="thinking-dot"></div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Input Area -->
-    <div class="chat-input-glass">
-        <form id="chatForm" class="input-form">
-            <div class="input-container-glass">
-                <input type="text" id="messageInput" class="message-input-glass" placeholder="Type your message..."
-                    autocomplete="off">
-                <button type="submit" class="send-btn-glass" id="sendButton" disabled>
-                    <i class="bi bi-send-fill"></i>
-                </button>
-            </div>
+    <footer class="chat-v2-input-area">
+        <form class="chat-v2-form" id="chat-form">
+            <input type="text" id="user-input" class="chat-v2-input" placeholder="Enter command or message..." required
+                autocomplete="off">
+            <button type="submit" class="chat-v2-send" id="send-btn" title="SEND MESSAGE" aria-label="SEND MESSAGE">
+                <i data-lucide="send" class="icon-sm"></i>
+            </button>
         </form>
-    </div>
+    </footer>
 </div>
 {% endblock %}
 
-{% block scripts %}
-<script src="{{ url_for('static', path='js/chat.js') }}"></script>
+{% block extra_js %}
 <script>
-    document.getElementById('clearSessionForm').addEventListener('submit', function(e) {
-        if (!confirm('Are you sure you want to clear the chat history?')) {
-            e.preventDefault();
+    const chatForm = document.getElementById('chat-form');
+    const userInput = document.getElementById('user-input');
+    const chatMessages = document.getElementById('chat-messages');
+    const sendBtn = document.getElementById('send-btn');
+    const emptyState = document.getElementById('chat-empty-state');
+
+    function appendMessage(text, sender) {
+        if (emptyState) {
+            emptyState.style.display = 'none';
+        }
+
+        const msgDiv = document.createElement('div');
+        msgDiv.className = `chat-v2-msg ${sender}`;
+
+        const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+        msgDiv.innerHTML = `
+            <div class="chat-v2-bubble">
+                ${text.replace(/\n/g, '<br>')}
+            </div>
+            <div class="chat-v2-meta">
+                ${sender.toUpperCase()} | ${timestamp}
+            </div>
+        `;
+
+        chatMessages.appendChild(msgDiv);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    chatForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const text = userInput.value.trim();
+        if (!text) return;
+
+        appendMessage(text, 'user');
+        userInput.value = '';
+
+        // Loading state
+        sendBtn.disabled = true;
+        const loadingDiv = document.createElement('div');
+        loadingDiv.className = 'chat-v2-msg bot';
+        loadingDiv.id = 'loading-indicator';
+        loadingDiv.innerHTML = '<div class="chat-v2-bubble opacity-50">Sychronizing neural networks...</div>';
+        chatMessages.appendChild(loadingDiv);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+
+        try {
+            const resp = await fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: text })
+            });
+
+            const indicator = document.getElementById('loading-indicator');
+            if (indicator) indicator.remove();
+
+            if (resp.ok) {
+                const data = await resp.json();
+                appendMessage(data.response, 'bot');
+            } else {
+                appendMessage("CRITICAL ERROR: FAILED TO COMMUNICATE WITH AI CORE.", 'bot');
+            }
+        } catch (err) {
+            const indicator = document.getElementById('loading-indicator');
+            if (indicator) indicator.remove();
+            appendMessage("CONNECTION INTERRUPTED: CHECK NETWORK PROTOCOLS.", 'bot');
+            console.error(err);
+        } finally {
+            sendBtn.disabled = false;
         }
     });
+
+    async function clearSession() {
+        if (!confirm('CONFIRM SESSION CLEARANCE? ALL CONSOLE HISTORY WILL BE PURGED.')) return;
+
+        try {
+            await fetch('/clear-session', { method: 'POST' });
+            location.reload();
+        } catch (err) {
+            console.error('Purge failed:', err);
+        }
+    }
 </script>
 {% endblock %}

@@ -194,6 +194,25 @@ tools = [
                 "additionalProperties": False
             }
         }
+    }, {
+        "type": "function",
+        "function": {
+            "name": "get_total",
+            "description": "Get total of product order. It takes the product name and the quantity and return the total amount",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "product_name": {
+                        "type": "string",
+                        "description": "Name of the product the user wants, e.g. 'waakye'"
+                    }
+                    , "quantity": {
+                        "type": "integer",
+                        "description": "Number of units the user wants to order, e.g. 2"
+                    }
+                }
+            }
+        }
     }
 
 ]
@@ -279,6 +298,7 @@ def get_rate(pair, side, amount_crypto, amount_fiat):
 
     try:
         response = requests.post(quotes_url, headers=headers, json=payload)
+        l
         response.raise_for_status()
         quote = response.json()
         print("Quote created successfully:")

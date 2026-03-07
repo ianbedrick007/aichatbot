@@ -6,6 +6,7 @@ from typing import Annotated
 from fastapi import FastAPI, Request, status, Depends, Form
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -13,14 +14,13 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from starlette.exceptions import HTTPException as StarletteHTTPException
-from fastapi.middleware.cors import CORSMiddleware
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from ai.run_ai import get_ai_response, update_conversation_history, get_conversation_history
 from auth import create_access_token
 from database import get_db, engine, get_current_user, get_current_business
-from models import Business, User, Base, Product, Message
+from models import Business, User, Base, Product, Message, Mailinglist
 from routers import products, users, conversations, chat
 from whatsapp_bot.app import router as whatsapp_router, configure_logging
 
@@ -50,10 +50,9 @@ app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://omnilabsghana.tech",
-        "https://www.omnilabsghana.tech",
-        "http://localhost:5273",
-        "http://127.0.0.1:5050"
+        "https://omnilabsghana.tech",  # 👈 REPLACE THIS with your actual Hostinger URL
+        "http://localhost:5273",  # For local development
+        "http://127.0.0.1:5050"  # For local static file testing
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -70,7 +69,7 @@ os.makedirs(os.path.join(media_dir, "product_pics"), exist_ok=True)
 os.makedirs(os.path.join(media_dir, "products"), exist_ok=True)
 
 # Mount static and media directories
-app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/static", StaticFiles(directory=static_dir), name="static")
 app.mount("/media", StaticFiles(directory=media_dir), name="media")
 
 # Print application loading message
@@ -168,9 +167,9 @@ async def chat_post(
         # Get last 20 messages for context (isolated by username for web chat)
         recent_messages = await get_conversation_history(
             business_id=business.id,
-            customer_id=current_user.username,
-            db=db
-        )
+            customer_id=current_user.id,
+            customer_name=current_user.username,
+            db=db)
 
         # Get AI response
         bot_response = await get_ai_response(
@@ -313,8 +312,8 @@ async def login_post(
         key="access_token",
         value=access_token,
         httponly=True,  # JS cannot read it
-        secure=True,    # ✅ Must be True for cross-domain (SameSite=None)
-        samesite="none", # ✅ Required for cross-domain requests
+        secure=True,  # ✅ Must be True for cross-domain (SameSite=None)
+        samesite="none",  # ✅ Required for cross-domain requests
         max_age=3600  # 1 hour
     )
 
@@ -514,6 +513,37 @@ def logout():
 def logout_page(request: Request):
     return templates.TemplateResponse("logout.html",
                                       {"request": request})
+
+
+@app.post("/mailing-list", tags=["Mailing List"])
+async def add_to_mailing_list(request: Request, db: Annotated[AsyncSession, Depends(get_db)]):
+    """
+    Handle the user registration process
+
+    Args:
+        request (Request): The HTTP request object containing form data.
+        db (AsyncSession): The database session.
+
+    Returns:
+        Response: A RedirectResponse to the login page on success, or the signup page with an error message.
+    """
+    form = await request.form()
+    email = form.get("email")
+
+    # Check if email already exists
+    email_check = await db.execute(select(Mailinglist).where(Mailinglist.email == func.lower(email)))
+    if email_check.first():
+        return templates.TemplateResponse(request=request, name="signup.html",
+                                          context={"error": "Email already registered"})
+
+    new_subscriber = Mailinglist(
+        email=email,
+    )
+    db.add(new_subscriber)
+    await db.commit()
+    await db.refresh(new_subscriber)
+
+    return RedirectResponse(url="https://omnilabsghana.tech/", status_code=status.HTTP_303_SEE_OTHER)
 
 
 # Request Exception Handler

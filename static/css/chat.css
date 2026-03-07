@@ -1,0 +1,124 @@
+/* Chat Interface */
+.chat-wrapper {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 128px);
+    background: var(--base-white);
+    border: 2px solid var(--base-black);
+    border-radius: 0;
+    overflow: hidden;
+    box-shadow: 6px 6px 0px var(--base-black);
+}
+
+.chat-header {
+    padding: var(--space-4) var(--space-6);
+    background: var(--base-black);
+    border-bottom: 2px solid var(--base-black);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    color: var(--base-white);
+}
+
+.chat-header h3 {
+    font-size: 0.875rem;
+    font-weight: 700;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    text-transform: uppercase;
+}
+
+.chat-logo-img {
+    height: 24px;
+    width: auto;
+    object-fit: contain;
+    filter: invert(1);
+    /* Logo might need inversion on black */
+}
+
+.chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--space-6);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+    background-color: var(--base-white);
+}
+
+.message {
+    display: flex;
+    flex-direction: column;
+    max-width: 85%;
+}
+
+.message.user {
+    align-self: flex-end;
+}
+
+.message.bot {
+    align-self: flex-start;
+}
+
+.message-bubble {
+    padding: var(--space-3) var(--space-4);
+    font-size: 0.8125rem;
+    line-height: 1.5;
+    border-radius: 0;
+    border: 2px solid var(--base-black);
+    font-family: var(--font-mono);
+}
+
+.message.user .message-bubble {
+    background-color: var(--teal-primary);
+    color: var(--base-black);
+    box-shadow: 4px 4px 0px var(--base-black);
+}
+
+.message.bot .message-bubble {
+    background-color: var(--base-white);
+    color: var(--base-black);
+    box-shadow: -4px 4px 0px var(--base-black);
+}
+
+.message-meta {
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: var(--base-black);
+    margin-top: var(--space-2);
+    text-transform: uppercase;
+}
+
+.message.user .message-meta {
+    text-align: right;
+}
+
+.chat-input-container {
+    padding: var(--space-4) var(--space-6);
+    background: var(--base-white);
+    border-top: 2px solid var(--base-black);
+}
+
+.chat-form {
+    display: flex;
+    gap: var(--space-3);
+    align-items: center;
+}
+
+.chat-input {
+    flex: 1;
+    padding: var(--space-3) var(--space-4);
+    border: 2px solid var(--base-black);
+    border-radius: 0;
+    outline: none;
+    transition: var(--transition-fast);
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+}
+
+.chat-input:focus {
+    box-shadow: 4px 4px 0px var(--base-black);
+    transform: translate(-1px, -1px);
+}

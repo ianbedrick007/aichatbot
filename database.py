@@ -62,6 +62,7 @@ def decode_token_and_get_user_id(token: str) -> int | None:
     except jwt.InvalidTokenError:
         return None
 
+
 async def get_current_user(
         request: Request,
         db: AsyncSession = Depends(get_db)

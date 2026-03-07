@@ -29,11 +29,16 @@ class Business(Base):
     # ✅ Business persona: defines the AI's personality/instructions
     persona: Mapped[str] = mapped_column(Text, nullable=True)
 
+    # ✅ NEW: Analytics and Resource tracking
+    ai_credits: Mapped[float] = mapped_column(Float, default=100.0)  # Start with 100 credits
+
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     user: Mapped["User"] = relationship("User", back_populates="business")
     messages_list = relationship('Message', back_populates='business', lazy=True, cascade='all, delete-orphan')
     products: Mapped[list["Product"]] = relationship("Product", back_populates="business", lazy=True)
+    orders: Mapped[list["Order"]] = relationship("Order", back_populates="business", lazy=True)
+    invoices: Mapped[list["Invoice"]] = relationship("Invoice", back_populates="business", lazy=True)
 
 
 # User model
@@ -103,3 +108,36 @@ class Product(Base):
     # def image_path(self) -> str:
     #     if self.image_url:
     #         return f"/media/product_pics/{self.image_url}"
+
+
+class Order(Base):
+    __tablename__ = 'orders'
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    business_id: Mapped[int] = mapped_column(Integer, ForeignKey('businesses.id'), nullable=False)
+    customer_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    amount: Mapped[float] = mapped_column(Float, nullable=False)
+    status: Mapped[str] = mapped_column(String(50), default='pending')  # pending, completed, cancelled
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    business: Mapped["Business"] = relationship('Business', back_populates='orders', lazy=True)
+
+
+class Invoice(Base):
+    __tablename__ = 'invoices'
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    business_id: Mapped[int] = mapped_column(Integer, ForeignKey('businesses.id'), nullable=False)
+    amount: Mapped[float] = mapped_column(Float, nullable=False)
+    status: Mapped[str] = mapped_column(String(50), default='unpaid')  # unpaid, paid, overdue
+    due_date: Mapped[datetime] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    business: Mapped["Business"] = relationship('Business', back_populates='invoices', lazy=True)
+
+
+class Mailinglist(Base):
+    __tablename__ = 'mailinglist'
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    email: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

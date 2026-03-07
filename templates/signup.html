@@ -1,59 +1,68 @@
-{% extends "base.html" %}
+<!DOCTYPE html>
+<html lang="en">
 
-{% block title %}Sign Up - AI Chatbot{% endblock %}
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>REGISTER | OMNILABS</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='css/main.css') }}">
+    <style>
+        .auth-card {
+            background: var(--base-white);
+            border: 2px solid var(--base-black);
+            box-shadow: 12px 12px 0px var(--base-black);
+        }
+    </style>
+</head>
 
-{% block body_class %}auth-body{% endblock %}
+<body class="dashboard-body d-flex align-center justify-center min-vh-100 p-4">
+    <div class="auth-card max-w-md w-full p-12">
+        <div class="text-center mb-10">
+            <img src="{{ url_for('static', path='assets/transp background 1, omni.png') }}" alt="OmniLabs Logo"
+                class="auth-logo">
+            <h2 class="text-xl font-bold uppercase mb-2">OPERATOR REGISTRATION</h2>
+            <p class="text-xs font-bold opacity-70 uppercase">INITIALIZE NEW BUSINESS PROTOCOL</p>
+        </div>
 
-{% block content %}
-    <div class="container d-flex justify-content-center align-items-center min-vh-100">
-        <div class="glass-card">
-            <div class="card-body p-5">
-                <h1 class="card-title text-center mb-4 text-white">Create Account</h1>
-                <p class="text-white-50 text-center mb-4">Join us to start your journey</p>
+        {% if error %}
+        <div class="mb-8 p-3 border-2 border-black bg-black text-white text-center text-xs font-bold uppercase">
+            {{ error }}
+        </div>
+        {% endif %}
 
-                {% if error %}
-                <div class="alert alert-danger glass-alert alert-dismissible fade show" role="alert">
-                    {{ error }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                </div>
-                {% endif %}
-
-                <form method="POST" action="{{ url_for('signup_post') }}">
-                    <div class="mb-3">
-                        <div class="input-field">
-                            <input type="text" class="form-control glass-input" id="username" name="username" required autofocus>
-                            <label for="username" class="glass-label">Username</label>
-                        </div>
-                    </div>
-
-                    <div class="mb-3">
-                        <div class="input-field">
-                            <input type="email" class="form-control glass-input" id="email" name="email">
-                            <label for="email" class="glass-label">Email (Optional)</label>
-                        </div>
-                    </div>
-
-                    <div class="mb-3">
-                        <div class="input-field">
-                            <input type="text" class="form-control glass-input" id="business_name" name="business_name" required>
-                            <label for="business_name" class="glass-label">Business Name</label>
-                        </div>
-                    </div>
-
-                    <div class="mb-4">
-                        <div class="input-field">
-                            <input type="password" class="form-control glass-input" id="password" name="password" required>
-                            <label for="password" class="glass-label">Password</label>
-                        </div>
-                    </div>
-
-                    <button type="submit" class="btn glass-btn w-100 mb-3">Sign Up</button>
-                </form>
-
-                <div class="text-center pt-3 border-top border-white border-opacity-25">
-                    <p class="mb-0 text-white-50">Already have an account? <a href="{{ url_for('login') }}" class="text-white text-decoration-none fw-bold">Login</a></p>
-                </div>
+        <form action="/signup" method="post" class="d-flex flex-column gap-6">
+            <div class="form-group mb-0">
+                <label class="form-label" for="business_name">BUSINESS DESIGNATION</label>
+                <input type="text" id="business_name" name="business_name" class="form-control"
+                    placeholder="ENTER BUSINESS NAME..." required autocomplete="organization">
             </div>
+
+            <div class="form-group mb-0">
+                <label class="form-label" for="username">OPERATOR ID</label>
+                <input type="text" id="username" name="username" class="form-control" placeholder="CHOOSE USERNAME..."
+                    required autocomplete="username">
+            </div>
+
+            <div class="form-group mb-0">
+                <label class="form-label" for="email">COMMUNICATION CHANNEL (EMAIL)</label>
+                <input type="email" id="email" name="email" class="form-control" placeholder="NAME@COMPANY.COM" required
+                    autocomplete="email">
+            </div>
+
+            <div class="form-group mb-4">
+                <label class="form-label" for="password">ACCESS KEY (PASSWORD)</label>
+                <input type="password" id="password" name="password" class="form-control" placeholder="••••••••"
+                    required autocomplete="new-password">
+            </div>
+
+            <button type="submit" class="btn btn-primary w-full">REGISTER SYSTEM</button>
+        </form>
+
+        <div class="mt-8 text-center text-xs font-bold">
+            <span class="opacity-70 uppercase">ALREADY REGISTERED?</span>
+            <a href="/login" class="text-brand underline uppercase ml-1">LOGIN HERE</a>
         </div>
     </div>
-{% endblock %}
+</body>
+
+</html>

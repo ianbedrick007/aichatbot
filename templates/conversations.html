@@ -1,590 +1,328 @@
-{% extends "base.html" %}
+<!DOCTYPE html>
+<html lang="en">
 
-{% block title %}Conversations - WhatsApp{% endblock %}
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp Live Feed | OmniLabs</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='css/whatsapp.css') }}">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        /* Specific sidebar link for return to dashboard */
+        .wa-return-btn {
+            padding: 10px 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-decoration: none;
+            color: var(--wa-green);
+            font-weight: 600;
+            font-size: 13px;
+            border-bottom: 1px solid var(--wa-border);
+            background: #f8f9fa;
+        }
 
-{% block head %}
-<link rel="stylesheet" href="{{ url_for('static', path='css/conversations.css') }}">
-<style>
-    :root {
-        --wa-bg: #111b21;
-        --wa-header: #202c33;
-        --wa-border: #2a3942;
-        --wa-incoming: #202c33;
-        --wa-outgoing: #005c4b;
-        --wa-primary: #00a884;
-        --wa-text-main: #e9edef;
-        --wa-text-sec: #8696a0;
-        --wa-panel-bg: #111b21;
-    }
+        .wa-return-btn:hover {
+            background: #eee;
+        }
 
-    body.conversations-body {
-        background-color: #090e11;
-        margin: 0;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-        color: var(--wa-text-main);
-    }
+        .wa-header-logo {
+            background: #fff;
+            padding: 5px;
+        }
 
-    .conversations-wrapper {
-        display: flex;
-        height: 100vh;
-        width: 100%;
-        overflow: hidden;
-        background-color: var(--wa-bg);
-        flex-direction: row;
-    }
+        .wa-profile-placeholder {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: #dfe5e7;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #adb5bd;
+        }
 
-    /* --- Sidebar --- */
-    .conversations-sidebar {
-        width: 30%;
-        min-width: 300px;
-        max-width: 450px;
-        display: flex;
-        flex-direction: column;
-        border-right: 1px solid var(--wa-border);
-        background-color: var(--wa-bg);
-        flex-shrink: 0;
-    }
+        .wa-header-placeholder {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #dfe5e7;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #adb5bd;
+        }
 
-    .sidebar-header {
-        height: 60px;
-        background-color: var(--wa-header);
-        padding: 10px 16px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-    }
+        .icon-return {
+            width: 18px;
+            height: 18px;
+        }
 
-    .customer-list {
-        flex: 1;
-        overflow-y: auto;
-    }
+        .icon-search-wa {
+            width: 16px;
+            height: 16px;
+            color: #54656f;
+        }
 
-    .customer-item {
-        display: flex;
-        align-items: center;
-        padding: 12px 15px;
-        cursor: pointer;
-        border-bottom: 1px solid var(--wa-border);
-        transition: background-color 0.2s;
-    }
+        .icon-lock-wa {
+            width: 12px;
+            height: 12px;
+        }
 
-    .customer-item:hover {
-        background-color: #202c33;
-    }
+        .icon-user-wa {
+            width: 24px;
+            height: 24px;
+        }
 
-    .customer-item.active {
-        background-color: #2a3942;
-    }
+        .icon-user-wa-sm {
+            width: 20px;
+            height: 20px;
+        }
 
-    .customer-avatar-small {
-        width: 45px;
-        height: 45px;
-        border-radius: 50%;
-        background-color: #6a7175;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin-right: 15px;
-        font-size: 18px;
-        color: white;
-    }
+        .icon-mic-wa {
+            width: 24px;
+            height: 24px;
+            cursor: pointer;
+        }
 
-    .customer-preview {
-        flex: 1;
-        overflow: hidden;
-    }
+        .wa-ai-active-label {
+            color: #00a884;
+        }
 
-    .customer-preview-header {
-        display: flex;
-        justify-content: space-between;
-        margin-bottom: 4px;
-    }
+        .wa-chat-header-name {
+            font-weight: 500;
+            color: #111b21;
+        }
+    </style>
+</head>
 
-    .customer-preview-name {
-        font-weight: 500;
-        color: var(--wa-text-main);
-    }
+<body class="whatsapp-mode">
+    <div class="wa-app-container">
+        <!-- Sidebar -->
+        <aside class="wa-sidebar">
+            <a href="/" class="wa-return-btn">
+                <i data-lucide="arrow-left" class="icon-return"></i> BACK TO DASHBOARD
+            </a>
 
-    .customer-preview-time {
-        font-size: 12px;
-        color: var(--wa-text-sec);
-    }
-
-    .customer-preview-message {
-        color: var(--wa-text-sec);
-        font-size: 14px;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        margin: 0;
-    }
-
-    /* Ensure the main chat area is a flex column to push input to bottom */
-    .conversation-detail {
-        display: flex;
-        flex-direction: column;
-        height: 100%;
-        position: relative;
-        overflow: hidden;
-        flex: 1;
-        background-color: #0b141a;
-        /* WhatsApp Dark Doodle Pattern */
-        background-image: url("https://static.whatsapp.net/rsrc.php/v3/yl/r/gi_Dck48hVP.png");
-        background-repeat: repeat;
-        background-size: 400px;
-    }
-
-    .conversation-header {
-        height: 60px;
-        background-color: var(--wa-header);
-        padding: 10px 16px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        z-index: 10;
-    }
-
-    /* Messages area takes available space and scrolls */
-    .conversation-messages {
-        flex: 1;
-        overflow-y: auto;
-        padding: 20px 5%;
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-    }
-
-    .message-item {
-        display: flex;
-        margin-bottom: 8px;
-        width: 100%;
-    }
-
-    .message-user {
-        justify-content: flex-start;
-    }
-
-    .message-bot {
-        justify-content: flex-end;
-    }
-
-    .message-bubble-glass {
-        max-width: 65%;
-        padding: 6px 7px 8px 9px;
-        border-radius: 7.5px;
-        position: relative;
-        font-size: 14.2px;
-        line-height: 19px;
-        box-shadow: 0 1px 0.5px rgba(0, 0, 0, 0.13);
-    }
-
-    .message-user .message-bubble-glass {
-        background-color: var(--wa-incoming);
-        color: var(--wa-text-main);
-        border-top-left-radius: 0;
-    }
-
-    .message-bot .message-bubble-glass {
-        background-color: var(--wa-outgoing);
-        color: var(--wa-text-main);
-        border-top-right-radius: 0;
-    }
-
-    .message-time {
-        font-size: 11px;
-        color: #8696a0;
-        /* Lighter gray for time */
-        float: right;
-        margin-left: 10px;
-        margin-top: 4px;
-        vertical-align: bottom;
-    }
-
-    /* Input area styling to match glass design */
-    .chat-input-area {
-        padding: 10px 16px;
-        background: var(--wa-header);
-        margin-top: auto;
-        /* Push to bottom */
-        min-height: 62px;
-    }
-
-    .chat-input-area .input-group {
-        background: var(--wa-border);
-        border-radius: 8px;
-        padding: 5px 10px;
-        border: none;
-        display: flex;
-        align-items: center;
-        width: 100%;
-    }
-
-    .chat-input-area .form-control {
-        border: none;
-        background: transparent;
-        box-shadow: none;
-        padding-left: 10px;
-        color: var(--wa-text-main);
-        flex: 1;
-    }
-
-    .chat-input-area .form-control::placeholder {
-        color: var(--wa-text-sec);
-    }
-
-    .chat-input-area .form-control:focus {
-        box-shadow: none;
-        background: transparent;
-        color: var(--wa-text-main);
-    }
-
-    .chat-input-area .btn-send {
-        background: transparent;
-        border: none;
-        color: var(--wa-text-sec);
-        padding: 0;
-        margin-left: 5px;
-        font-size: 20px;
-    }
-
-    /* Header Icons */
-    .icon-btn {
-        color: var(--wa-text-sec);
-        margin-left: 15px;
-        background: none;
-        border: none;
-        font-size: 1.2rem;
-        cursor: pointer;
-    }
-
-    .header-title {
-        font-size: 16px;
-        font-weight: 600;
-        color: var(--wa-text-main);
-        margin: 0;
-    }
-
-    .sidebar-title {
-        font-size: 20px;
-        font-weight: 700;
-        color: var(--wa-text-main);
-        margin: 0;
-    }
-</style>
-{% endblock %}
-
-{% block body_class %}conversations-body{% endblock %}
-
-{% block content %}
-<div class="conversations-wrapper">
-    <!-- Two Column Layout -->
-    <!-- Left Sidebar - Customer List -->
-    <aside class="conversations-sidebar">
-        <div class="sidebar-header">
-            <div style="display: flex; align-items: center; gap: 10px;">
-                <div class="customer-avatar-small" style="width: 40px; height: 40px; background: #00a884;">
-                    <span>{{ business.name[0].upper() if business else 'W' }}</span>
+            <header class="wa-sidebar-header">
+                <img src="{{ url_for('static', path='assets/transp background 1, omni.png') }}"
+                    class="wa-profile-img wa-header-logo" alt="Omni">
+                <div class="wa-main-header-icons">
+                    <i data-lucide="users-2"></i>
+                    <i data-lucide="circle-dashed"></i>
+                    <i data-lucide="message-square-plus"></i>
+                    <i data-lucide="more-vertical"></i>
                 </div>
-                <h2 class="sidebar-title">Chats</h2>
-            </div>
-            <div class="header-right">
-                <button onclick="location.reload()" class="icon-btn" title="Refresh">
-                    <i class="bi bi-arrow-clockwise"></i>
-                </button>
-                <a href="#" class="icon-btn" title="New Chat">
-                    <i class="bi bi-chat-left-text-fill"></i>
-                </a>
-                <a href="#" class="icon-btn" title="Menu">
-                    <i class="bi bi-three-dots-vertical"></i>
-                </a>
-            </div>
-        </div>
+            </header>
 
-        <!-- Search Bar Mockup -->
-        <div style="padding: 8px 12px; border-bottom: 1px solid var(--wa-border);">
-            <div
-                style="background: var(--wa-header); border-radius: 8px; padding: 6px 12px; display: flex; align-items: center;">
-                <i class="bi bi-search" style="color: var(--wa-text-sec); font-size: 14px; margin-right: 15px;"></i>
-                <input type="text" placeholder="Search or start new chat"
-                    style="background: transparent; border: none; color: white; width: 100%; outline: none; font-size: 14px;">
-            </div>
-        </div>
-
-        <div class="customer-list" id="customerList">
-            <!-- Loading state -->
-            <div class="loading-state" style="padding: 20px; text-align: center; color: var(--wa-text-sec);">
-                <i class="bi bi-hourglass-split"></i>
-                <p>Loading chats...</p>
-            </div>
-        </div>
-    </aside>
-
-    <!-- Right Panel - Conversation Messages -->
-    <main class="conversation-detail">
-        <div class="empty-state-glass" id="emptyState"
-            style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: var(--wa-text-sec); border-bottom: 6px solid #00a884;">
-            <i class="bi bi-whatsapp" style="font-size: 64px; margin-bottom: 20px; color: #3b4a54;"></i>
-            <h2 style="color: var(--wa-text-main); font-weight: 300;">WhatsApp Web</h2>
-            <p class="empty-text" style="font-size: 14px;">Send and receive messages without keeping your phone online.
-            </p>
-        </div>
-
-        <!-- Conversation Header (hidden initially) -->
-        <div class="conversation-header" id="conversationHeader" style="display: none;">
-            <div class="customer-info" style="display: flex; align-items: center;">
-                <div class="customer-avatar-small" style="margin-right: 15px;">
-                    <span id="customerInitial">C</span>
-                </div>
-                <div>
-                    <h3 class="customer-name" id="selectedCustomerName"
-                        style="margin: 0; font-size: 16px; color: var(--wa-text-main);">Customer</h3>
-                    <p class="customer-status" style="margin: 0; font-size: 12px; color: var(--wa-text-sec);">click here
-                        for contact info</p>
+            <div class="wa-search-container">
+                <div class="wa-search-box">
+                    <i data-lucide="search" class="icon-search-wa"></i>
+                    <input type="text" class="wa-search-input" placeholder="Search or start new chat">
                 </div>
             </div>
-            <div class="header-actions" style="display: flex; align-items: center;">
-                <div class="form-check form-switch" style="margin-right: 15px;">
-                    <input class="form-check-input" type="checkbox" id="aiToggle" checked onchange="handleAiToggle()">
-                    <label class="form-check-label" for="aiToggle"
-                        style="color: var(--wa-text-sec); font-size: 12px;">AI</label>
+
+            <div class="wa-chat-list" id="customer-list">
+                <div class="text-center p-8 mt-12 opacity-50">
+                    Loading chats...
                 </div>
-                <i class="bi bi-search icon-btn"></i>
-                <i class="bi bi-three-dots-vertical icon-btn"></i>
             </div>
-        </div>
+        </aside>
 
-        <!-- Messages Area (hidden initially) -->
-        <div class="conversation-messages" id="conversationMessages" style="display: none;">
-            <!-- Messages will be loaded here -->
-        </div>
-
-        <!-- AI Off Message Input (Moved to bottom) -->
-        <div id="aiOffMessageInput" class="chat-input-area" style="display: none;">
-            <div class="input-group">
-                <i class="bi bi-emoji-smile"
-                    style="color: var(--wa-text-sec); font-size: 20px; margin-right: 10px; cursor: pointer;"></i>
-                <i class="bi bi-paperclip"
-                    style="color: var(--wa-text-sec); font-size: 20px; margin-right: 10px; cursor: pointer;"></i>
-                <input type="text" class="form-control" id="manualMessage" placeholder="Type a message"
-                    onkeypress="handleKeyPress(event)">
-                <button class="btn-send" onclick="sendMessage()">
-                    <i class="bi bi-send-fill"></i>
-                </button>
+        <!-- Main Chat Pane -->
+        <main class="wa-main" id="chat-pane">
+            <div class="wa-empty-state">
+                <img src="{{ url_for('static', path='assets/transp background 1, omni.png') }}" alt="Omni"
+                    class="wa-empty-icon">
+                <h1 class="wa-empty-title">WhatsApp for Business</h1>
+                <p class="wa-empty-text">
+                    Send and receive messages without keeping your phone online. Use OmniLabs AI to automate your
+                    customer engagement on WhatsApp.
+                </p>
+                <div class="wa-encryption-note">
+                    <i data-lucide="lock" class="icon-lock-wa"></i> End-to-end encrypted
+                </div>
             </div>
-        </div>
-    </main>
-</div>
-{% endblock %}
+        </main>
+    </div>
 
-{% block scripts %}
-<script>
-    let selectedCustomer = null;
-    let customersData = {}; // Store customer data to access ai_enabled status
+    <script>
+        let currentCustomerId = null;
+        let refreshInterval = null;
 
-    // Load customer list on page load
-    document.addEventListener('DOMContentLoaded', function () {
-        loadCustomers();
-    });
-
-    async function loadCustomers() {
-        try {
-            const response = await fetch('/api/customers');
-            
-            if (response.status === 401) {
-                window.location.href = '/login';
-                return;
+        async function loadCustomers() {
+            try {
+                const resp = await fetch('/api/customers');
+                const data = await resp.json();
+                renderCustomerList(data.customers);
+            } catch (err) {
+                console.error('Failed to load customers:', err);
             }
-            
-            const data = await response.json();
+        }
 
-            // Check if data.customers exists before accessing length
-            if (!data.customers) {
-                throw new Error(data.detail || "Failed to load customers");
-            }
-
-            const customerList = document.getElementById('customerList');
-
-            if (data.customers.length === 0) {
-                customerList.innerHTML = `
-                <div class="empty-state-glass">
-                    <i class="bi bi-inbox" style="font-size: 32px; opacity: 0.5;"></i>
-                    <p class="empty-text">No conversations yet</p>
-                </div>
-            `;
+        function renderCustomerList(customers) {
+            const list = document.getElementById('customer-list');
+            if (!customers || customers.length === 0) {
+                list.innerHTML = `<div class="text-center p-8 mt-12 opacity-50">No active conversations</div>`;
                 return;
             }
 
-            customerList.innerHTML = data.customers.map(customer => {
-                // Store data for lookup later
-                customersData[customer.id] = customer;
-                return `
-            <div class="customer-item" onclick="selectCustomer('${customer.id}', this)">
-                <div class="customer-avatar-small">
-                    <span>${customer.name[0].toUpperCase()}</span>
-                </div>
-                <div class="customer-preview">
-                    <div class="customer-preview-header">
-                        <span class="customer-preview-name">${customer.name}</span>
-                        <span class="customer-preview-time">${customer.last_timestamp.split(' ')[1]}</span>
+            list.innerHTML = customers.map(c => `
+                <div class="wa-chat-item ${c.id === currentCustomerId ? 'active' : ''}" onclick="selectCustomer('${c.id}', '${c.name.replace(/'/g, "\\'")}')">
+                    <div class="wa-profile-placeholder">
+                        <i data-lucide="user" class="icon-user-wa"></i>
                     </div>
-                    <p class="customer-preview-message">${customer.last_message}</p>
-                    <span class="message-count-badge">${customer.message_count}</span>
+                    <div class="wa-chat-item-info">
+                        <div class="wa-chat-item-header">
+                            <span class="wa-chat-item-name">${c.name}</span>
+                            <span class="wa-chat-item-time">${c.last_timestamp ? c.last_timestamp.split(' ')[1].substring(0, 5) : ''}</span>
+                        </div>
+                        <div class="wa-chat-item-msg">
+                            ${c.ai_enabled ? '<span class="wa-ai-active-label">[AI Active]</span> ' : ''}
+                            ${c.last_message || 'Start a conversation'}
+                        </div>
+                    </div>
                 </div>
-            </div>
-        `;
-            }).join('');
-
-        } catch (error) {
-            console.error('Error loading customers:', error);
-            document.getElementById('customerList').innerHTML = `
-            <div class="error-state">
-                <i class="bi bi-exclamation-triangle"></i>
-                <p>Failed to load customers</p>
-            </div>
-        `;
-        }
-    }
-
-    async function selectCustomer(customerId, element) {
-        selectedCustomer = customerId;
-        const customer = customersData[customerId];
-
-        // Update UI to show selected state
-        document.querySelectorAll('.customer-item').forEach(item => {
-            item.classList.remove('active');
-        });
-        if (element) {
-            element.classList.add('active');
+            `).join('');
+            lucide.createIcons();
         }
 
-        // Hide empty state, show conversation
-        document.getElementById('emptyState').style.display = 'none';
-        document.getElementById('conversationHeader').style.display = 'flex';
-        document.getElementById('conversationMessages').style.display = 'flex';
+        async function selectCustomer(id, name) {
+            currentCustomerId = id;
+            document.querySelectorAll('.wa-chat-item').forEach(el => el.classList.remove('active'));
+            loadMessages(id);
+            renderChatWindow(name);
 
-        // Update header
-        document.getElementById('selectedCustomerName').textContent = customer ? customer.name : customerId;
-        document.getElementById('customerInitial').textContent = (customer ? customer.name : customerId)[0].toUpperCase();
-
-        // Set toggle state based on stored customer data
-        const toggle = document.getElementById('aiToggle');
-        if (customer) {
-            toggle.checked = customer.ai_enabled;
-
-            // Show/Hide input based on AI status
-            const messageInput = document.getElementById('aiOffMessageInput');
-            messageInput.style.display = customer.ai_enabled ? 'none' : 'block';
+            if (refreshInterval) clearInterval(refreshInterval);
+            refreshInterval = setInterval(() => loadMessages(id), 5000);
+            loadCustomers();
         }
 
-        // Load messages
-        await loadMessages(customerId);
-    }
+        async function loadMessages(id) {
+            if (!id || id !== currentCustomerId) return;
+            try {
+                const resp = await fetch(`/api/customer-messages/${id}`);
+                const data = await resp.json();
+                const msgList = document.getElementById('message-list');
+                if (!msgList) return;
 
-    async function loadMessages(customerName) {
-        try {
-            const response = await fetch(`/api/customer-messages/${encodeURIComponent(customerName)}`);
-            
-            if (response.status === 401) {
-                window.location.href = '/login';
-                return;
+                const html = data.messages.map(m => `
+                    <div class="wa-msg-bubble ${m.is_bot ? 'sent' : 'received'}">
+                        ${m.text}
+                        <span class="wa-msg-time">${m.timestamp.split(' ')[1].substring(0, 5)}</span>
+                    </div>
+                `).join('');
+
+                if (msgList.innerHTML !== html) {
+                    msgList.innerHTML = html;
+                    msgList.scrollTop = msgList.scrollHeight;
+                }
+            } catch (err) {
+                console.error('Failed to load messages:', err);
             }
-            
-            const data = await response.json();
+        }
 
-            const messagesContainer = document.getElementById('conversationMessages');
-
-            if (data.messages.length === 0) {
-                messagesContainer.innerHTML = `
-                <div class="empty-state-glass">
-                    <p class="empty-text">No messages yet</p>
+        function renderChatWindow(name) {
+            const pane = document.getElementById('chat-pane');
+            pane.innerHTML = `
+                <div class="wa-main-header">
+                    <div class="wa-main-header-info">
+                        <div class="wa-header-placeholder">
+                            <i data-lucide="user" class="icon-user-wa-sm"></i>
+                        </div>
+                        <div>
+                            <div class="wa-chat-header-name">${name}</div>
+                            <div class="wa-online-status" id="online-status">Online</div>
+                        </div>
+                    </div>
+                    <div class="wa-main-header-icons">
+                        <i data-lucide="search"></i>
+                        <i data-lucide="more-vertical"></i>
+                    </div>
                 </div>
+
+                <div class="wa-chat-messages" id="message-list">
+                    <div style="height: 100%; display: flex; align-items: center; justify-content: center; color: #667781;">Syncing...</div>
+                </div>
+
+                <footer class="wa-footer">
+                    <div class="wa-footer-icons">
+                        <i data-lucide="smile"></i>
+                        <i data-lucide="paperclip"></i>
+                    </div>
+                    <div class="wa-input-container">
+                        <input type="text" id="manual-msg" class="wa-input" placeholder="Type a message" onkeypress="handleKeyPress(event)">
+                    </div>
+                    <div id="action-btn" style="color: #54656f;">
+                        <i data-lucide="mic" class="icon-mic-wa"></i>
+                    </div>
+                    <button id="ai-toggle-btn" class="btn-ai-toggle" onclick="toggleAI()">AI OFF</button>
+                </footer>
             `;
-                return;
-            }
-
-            messagesContainer.innerHTML = data.messages.map(msg => `
-            <div class="message-item ${msg.is_bot ? 'message-bot' : 'message-user'}">
-                <div class="message-bubble-glass">
-                    <p class="message-text">${msg.text}</p>
-                    <span class="message-time">${msg.timestamp}</span>
-                </div>
-            </div>
-        `).join('');
-
-            // Scroll to bottom
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
-
-        } catch (error) {
-            console.error('Error loading messages:', error);
-            document.getElementById('conversationMessages').innerHTML = `
-            <div class="error-state">
-                <p>Failed to load messages</p>
-            </div>
-        `;
+            lucide.createIcons();
+            checkAIStatus();
         }
-    }
 
-    function handleAiToggle() {
-        const toggle = document.getElementById('aiToggle');
-        const messageInput = document.getElementById('aiOffMessageInput');
-
-        if (!toggle.checked) {
-            // AI turned OFF
-            // 1. Call API to disable AI immediately
-            callToggleApi(false, null);
-            // 2. Show input field
-            messageInput.style.display = 'block';
-            document.getElementById('manualMessage').focus();
-        } else {
-            // AI turned ON
-            // 1. Call API to enable AI
-            callToggleApi(true, null);
-            // 2. Hide input field
-            messageInput.style.display = 'none';
+        function handleKeyPress(e) {
+            if (e.key === 'Enter') sendMessage();
         }
-    }
 
-    function handleKeyPress(event) {
-        if (event.key === 'Enter') {
-            sendMessage();
+        async function checkAIStatus() {
+            if (!currentCustomerId) return;
+            const resp = await fetch('/api/customers');
+            const data = await resp.json();
+            const c = data.customers.find(cust => cust.id === currentCustomerId);
+            if (c) updateToggleButton(c.ai_enabled);
         }
-    }
 
-    async function sendMessage() {
-        const messageInput = document.getElementById('manualMessage');
-        const message = messageInput.value.trim();
-
-        if (!message) return;
-
-        // Clear input but keep it visible (since AI is still off)
-        messageInput.value = '';
-
-        await callToggleApi(false, message);
-    }
-
-    async function callToggleApi(enable, message) {
-        try {
-            const response = await fetch('/api/toggle-ai', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    customer_id: selectedCustomer,
-                    enable_ai: enable,
-                    message: message
-                })
-            });
-            // Update local state
-            if (customersData[selectedCustomer]) {
-                customersData[selectedCustomer].ai_enabled = enable;
-            }
-            // Reload messages if a manual message was sent
-            if (message) {
-                await loadMessages(selectedCustomer);
-            }
-        } catch (error) {
-            console.error('Error toggling AI:', error);
-            alert('Failed to update AI status');
+        function updateToggleButton(enabled) {
+            const btn = document.getElementById('ai-toggle-btn');
+            if (!btn) return;
+            btn.innerText = enabled ? 'AI ACTIVE' : 'AI DISABLED';
+            btn.style.background = enabled ? '#00a884' : '#667781';
+            btn.style.color = '#fff';
+            btn.style.border = 'none';
         }
-    }
-</script>
-{% endblock %}
+
+        async function toggleAI() {
+            const btn = document.getElementById('ai-toggle-btn');
+            const newState = !btn.innerText.includes('ACTIVE');
+            try {
+                await fetch('/api/toggle-ai', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ customer_id: currentCustomerId, enable_ai: newState })
+                });
+                checkAIStatus();
+                loadCustomers();
+            } catch (err) { console.error(err); }
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('manual-msg');
+            const msg = input.value.trim();
+            if (!msg || !currentCustomerId) return;
+
+            try {
+                await fetch('/api/toggle-ai', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        customer_id: currentCustomerId,
+                        enable_ai: false,
+                        message: msg
+                    })
+                });
+                input.value = '';
+                loadMessages(currentCustomerId);
+                checkAIStatus();
+            } catch (err) { console.error(err); }
+        }
+
+        loadCustomers();
+        setInterval(loadCustomers, 30000);
+        lucide.createIcons();
+    </script>
+</body>
+
+</html>

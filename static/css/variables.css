@@ -1,0 +1,62 @@
+:root {
+    /* Colors - High Contrast Mono + Digital Teal */
+    --base-white: #ffffff;
+    --base-black: #000000;
+
+    /* Digital Teal Accent */
+    --teal-primary: #00f2ff;
+    --teal-hover: #00d4df;
+    --teal-soft: #e0fdff;
+
+    /* Semantic Mappings - Strict B&W */
+    --bg-app: var(--base-white);
+    --bg-sidebar: var(--base-white);
+    --bg-surface: var(--base-white);
+
+    --text-primary: var(--base-black);
+    --text-secondary: var(--base-black);
+    --text-tertiary: var(--base-black);
+
+    --border-subtle: var(--base-black);
+    --border-medium: var(--base-black);
+
+    --brand-primary: var(--teal-primary);
+    --brand-hover: var(--teal-hover);
+
+    /* Fonts - Courier New Monospace */
+    --font-sans: 'Courier New', Courier, monospace;
+    --font-mono: 'Courier New', Courier, monospace;
+
+    /* Spacing System - 4px scale */
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 20px;
+    --space-6: 24px;
+    --space-8: 32px;
+    --space-12: 48px;
+
+    /* Radius - Keeping it sharp or slightly rounded */
+    --radius-xs: 0px;
+    --radius-sm: 0px;
+    --radius-md: 0px;
+    --radius-lg: 0px;
+    --radius-xl: 0px;
+    --radius-pill: 0px;
+
+    /* Shadows - Sharp/Brutalist style */
+    --shadow-xs: 2px 2px 0px rgba(0, 0, 0, 1);
+    --shadow-sm: 4px 4px 0px rgba(0, 0, 0, 1);
+    --shadow-md: 6px 6px 0px rgba(0, 0, 0, 1);
+    --shadow-lg: 8px 8px 0px rgba(0, 0, 0, 1);
+
+    /* Z-index */
+    --z-sidebar: 100;
+    --z-topbar: 90;
+    --z-modal: 200;
+
+    /* Transitions */
+    --transition-fast: 50ms ease;
+    --transition-base: 100ms ease;
+}

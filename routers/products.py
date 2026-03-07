@@ -1,18 +1,19 @@
-from typing import Annotated
-from datetime import datetime, timezone
 import os
 import uuid
+from datetime import datetime, timezone
+from typing import Annotated
 
+from PIL import Image
 from fastapi import APIRouter, Depends, HTTPException, status, Form, UploadFile, File
 from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from PIL import Image
+from sqlalchemy.orm import selectinload
 
+from ai.image_embeddings import generate_image_embedding
 from database import get_db, get_current_user
 from models import Product, Business, User
 from schemas import ProductResponse, ProductUpdate, ProductCreate
-from ai.image_embeddings import generate_image_embedding
 
 router = APIRouter()
 
@@ -61,13 +62,32 @@ def save_upload_file(upload_file: UploadFile) -> str:
     with open(filepath, "wb") as f:
         f.write(contents)
 
-    return filename, filepath
+    return filename + filepath
 
 
 @router.get("/api/v1/products/{business_id}", response_model=list[ProductResponse], tags=["Products"])
 async def get_products(business_id: int, db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(Product).where(Product.business_id == business_id))
+    products = result.scalars().all()
+    return products
+
+
+@router.get("/{business_id}/products", response_model=list[ProductResponse])
+async def get_business_products(business_id: int, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Business).where(Business.id == business_id))
+    business = result.scalars().first()
+    if not business:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Business not found",
+        )
+    result = await db.execute(
+        select(Product)
+        .options(selectinload(Product.business))
+        .where(Product.business_id == business_id)
+        .order_by(Product.created_at.desc()),
+    )
     products = result.scalars().all()
     return products
 
@@ -149,7 +169,6 @@ async def update_product_image(
         product_id: int,
         image: UploadFile = File(...),
         db: AsyncSession = Depends(get_db),
-        current_user: User = Depends(get_current_user)
 ):
     """Upload or replace a product's image and regenerate its embedding."""
     result = await db.execute(select(Product).where(Product.id == product_id))
@@ -212,3 +231,5 @@ async def delete_product(product_id: int, db: AsyncSession = Depends(get_db)):
 
     await db.delete(product)
     await db.commit()
+
+

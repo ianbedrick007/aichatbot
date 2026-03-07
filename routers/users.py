@@ -4,7 +4,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import func, select, or_
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session
 
 from auth import (
     create_access_token,
@@ -12,13 +12,13 @@ from auth import (
 )
 from config import settings
 from database import get_db
-from models import User, Business, Product
-from schemas import Token, UserResponse, SignupRequest, UserPrivate, UserUpdate, ProductResponse, UserPublic
+from models import User, Business
+from schemas import Token, UserResponse, SignupRequest, UserPrivate, UserUpdate, UserPublic
 
 router = APIRouter()
 
 
-@router.post("/api/v1/signup", response_model=UserResponse, status_code=status.HTTP_201_CREATED, tags=["Users"])
+@router.post("/signup", response_model=UserResponse, status_code=status.HTTP_201_CREATED, tags=["Users"])
 def create_user(request: SignupRequest, db: Annotated[Session, Depends(get_db)]):
     username = request.username.strip()
     email = request.email
@@ -151,25 +151,6 @@ def get_user(user_id: int, db: Annotated[Session, Depends(get_db)]):
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
 
-@router.get("/{business_id}/products", response_model=list[ProductResponse])
-def get_business_products(business_id: int, db: Annotated[Session, Depends(get_db)]):
-    result = db.execute(select(Business).where(Business.id == business_id))
-    business = result.scalars().first()
-    if not business:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Business not found",
-        )
-    result = db.execute(
-        select(Product)
-        .options(selectinload(Product.business))
-        .where(Product.business_id == business_id)
-        .order_by(Product.created_at.desc()),
-    )
-    products = result.scalars().all()
-    return products
-
-
 @router.patch("/{user_id}", response_model=UserPrivate)
 def update_user(
         user_id: int,
@@ -238,3 +219,4 @@ def delete_user(user_id: int, db: Annotated[Session, Depends(get_db)]):
 
     db.delete(user)
     db.commit()
+

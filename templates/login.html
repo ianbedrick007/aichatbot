@@ -1,59 +1,63 @@
-{% extends "base.html" %}
+<!DOCTYPE html>
+<html lang="en">
 
-{% block title %}Login - AI Chatbot{% endblock %}
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LOGIN | OMNILABS</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='css/main.css') }}">
+    <style>
+        body.auth-page {
+            background-color: #f8f9fa;
+            /* Subtle contrast background */
+        }
 
-{% block body_class %}auth-body{% endblock %}
+        .auth-card {
+            background: var(--base-white);
+            border: 2px solid var(--base-black);
+            box-shadow: 16px 16px 0px var(--base-black);
+            margin: auto;
+            /* Ensure centering in flex */
+        }
+    </style>
+</head>
 
-{% block content %}
-<div class="container d-flex justify-content-center align-items-center min-vh-100">
-    <div class="glass-card">
-        <div class="card-body p-5">
-            <h1 class="card-title text-center mb-4 text-white">Login</h1>
-            <p class="text-white-50 text-center mb-4">Sign in to continue to your account</p>
+<body class="auth-page d-flex align-center justify-center min-vh-100 p-4">
+    <div class="auth-card max-w-md w-full p-12">
+        <div class="text-center mb-10">
+            <img src="{{ url_for('static', path='assets/transp background 1, omni.png') }}" alt="OmniLabs Logo"
+                class="auth-logo">
+            <h2 class="text-xl font-bold uppercase mb-2">SYSTEM ACCESS</h2>
+            <p class="text-xs font-bold opacity-70 uppercase">PROCEED WITH CREDENTIALS</p>
+        </div>
 
-            {% if error %}
-<div class="alert alert-danger glass-alert alert-dismissible fade show" role="alert">
-    {{ error }}
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-</div>
-{% endif %}
+        {% if error %}
+        <div class="mb-8 p-3 border-2 border-black bg-black text-white text-center text-xs font-bold uppercase">
+            {{ error }}
+        </div>
+        {% endif %}
 
-{% if messages %}
-    {% for message in messages %}
-    <div class="alert alert-{{ 'danger' if category == 'error' else 'success' if category == 'success' else 'info' }} alert-dismissible fade show glass-alert" role="alert">
-        {{ message }}
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    </div>
-    {% endfor %}
-{% endif %}
-
-
-
-        <form method="POST" action="{{ url_for('login') }}">
-            <div class="mb-4">
-                <div class="input-field">
-                    <input type="text" class="form-control glass-input" id="username" name="username" required
-                           autofocus>
-                    <label for="username" class="glass-label">Username</label>
-                </div>
+        <form action="/login" method="post" class="d-flex flex-column gap-6">
+            <div class="form-group mb-0">
+                <label class="form-label" for="username">OPERATOR ID</label>
+                <input type="text" id="username" name="username" class="form-control" placeholder="ENTER USERNAME..."
+                    required autocomplete="username">
             </div>
 
-            <div class="mb-4">
-                <div class="input-field">
-                    <input type="password" class="form-control glass-input" id="password" name="password" required>
-                    <label for="password" class="glass-label">Password</label>
-                </div>
+            <div class="form-group mb-4">
+                <label class="form-label" for="password">ACCESS KEY</label>
+                <input type="password" id="password" name="password" class="form-control"
+                    placeholder="ENTER PASSWORD..." required autocomplete="current-password">
             </div>
 
-            <button type="submit" class="btn glass-btn w-100 mb-3">Sign In</button>
+            <button type="submit" class="btn btn-primary w-full">INITIALIZE SESSION</button>
         </form>
 
-        <div class="text-center pt-3 border-top border-white border-opacity-25">
-            <p class="mb-0 text-white-50">Don't have an account? <a href="{{ url_for('signup') }}"
-                                                                    class="text-white text-decoration-none fw-bold">Sign
-                up</a></p>
+        <div class="mt-8 text-center text-xs font-bold">
+            <span class="opacity-70 uppercase">UNREGISTERED OPERATOR?</span>
+            <a href="/signup" class="text-brand underline uppercase ml-1">REGISTER HERE</a>
         </div>
     </div>
-</div>
-</div>
-{% endblock %}
+</body>
+
+</html>

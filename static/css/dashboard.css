@@ -1,0 +1,66 @@
+/* Dashboard Specifics */
+.dashboard-container {
+    padding-top: 2rem;
+    padding-bottom: 4rem;
+}
+
+/* Stat Cards */
+.stat-card {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    height: 100%;
+    background: #FFFFFF;
+}
+
+.stat-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-surface);
+    color: var(--text-primary);
+    margin-bottom: 1rem;
+}
+
+.stat-value {
+    font-size: 2rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    color: var(--text-primary);
+}
+
+.stat-label {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+/* Tables */
+.table-dash {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.table-dash th {
+    text-align: left;
+    padding: 1rem;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    border-bottom: 1px solid var(--border-light);
+    font-weight: 600;
+}
+
+.table-dash td {
+    padding: 1rem;
+    border-bottom: 1px solid var(--border-light);
+    color: var(--text-primary);
+}
+
+.table-dash tr:last-child td {
+    border-bottom: none;
+}
