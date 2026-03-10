@@ -1,4 +1,6 @@
+import asyncio
 import contextvars
+import logging
 import inspect
 import json
 import os
@@ -18,6 +20,10 @@ from models import Message, Business
 from payment.payment import initialize_payment, verify_payment
 
 load_dotenv()
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 api_key = os.getenv("OPENAI_API_KEY")
 ai_model = os.getenv("OPEN_ROUTER_MODEL")
@@ -199,7 +205,7 @@ async def get_ai_response(user_input, db, conversation_history=None, business_id
             messages_log.append(msg_copy)
         else:
             messages_log.append(msg)
-    print(f"Messages: {messages_log}")
+    logger.info(f"Sending messages to AI: {messages_log}")
 
     try:
         # 2. First model call
@@ -210,33 +216,46 @@ async def get_ai_response(user_input, db, conversation_history=None, business_id
         )
         completion.model_dump()
         response_message = completion.choices[0].message
-        print(response_message)
+        logger.info(f"AI First Response: {response_message}")
 
         # 3. If no tool calls → return direct response
         if response_message.tool_calls:
-            print("🔧 Tool calls detected!")
+            logger.info("🔧 Tool calls detected!")
             messages.append(response_message)
 
-            # 4. Execute all tool calls
-            for tool_call in response_message.tool_calls:
+            # 4. Execute all tool calls in parallel
+            # We use a lock for tools that require the shared DB session to avoid race conditions
+            db_lock = asyncio.Lock()
+            db_tools = {"get_products", "search_similar_products", "search_by_image"}
+
+            async def execute_tool(tool_call):
                 function_name = tool_call.function.name
                 function_args = json.loads(tool_call.function.arguments)
-                print(f"Calling: {function_name} with {function_args}")
+                logger.info(f"Calling tool: {function_name} with {function_args}")
 
                 # Execute the tool (business_id injected in call_function)
-                function_result = await call_function(function_name, db=db, business_id=business_id, **function_args)
+                # Acquire lock only if the tool uses the DB session
+                if function_name in db_tools:
+                    async with db_lock:
+                        function_result = await call_function(function_name, db=db, business_id=business_id,
+                                                              **function_args)
+                else:
+                    function_result = await call_function(function_name, db=db, business_id=business_id,
+                                                          **function_args)
 
                 # Log result safely (truncate if too long)
                 result_str = str(function_result)
-                print(f"Result: {result_str[:200]}..." if len(result_str) > 200 else f"Result: {result_str}")
+                logger.info(f"Tool Result: {result_str[:200]}..." if len(result_str) > 200 else f"Tool Result: {result_str}")
 
-                # Append tool result
-                messages.append({
+                return {
                     "role": "tool",
                     "tool_call_id": tool_call.id,
                     "name": function_name,
                     "content": json.dumps(function_result)
-                })
+                }
+
+            tool_outputs = await asyncio.gather(*(execute_tool(tc) for tc in response_message.tool_calls))
+            messages.extend(tool_outputs)
 
             # 5. Second API call with all function results
             second_completion = await _get_client().chat.completions.create(
@@ -244,14 +263,15 @@ async def get_ai_response(user_input, db, conversation_history=None, business_id
                 messages=messages,
                 tools=tools,
             )
-            return second_completion.choices[0].message.content or ""
+            final_response = second_completion.choices[0].message.content or ""
+            logger.info(f"AI Final Response: {final_response}")
+            return final_response
         else:
             # No tools needed, return direct response
             return response_message.content or ""
 
     except Exception as e:
-        traceback.print_exc()
-        print(f"Error: {e}")
+        logger.error(f"AI Response Error: {e}", exc_info=True)
         return "Sorry, I'm having trouble responding right now."
 
 

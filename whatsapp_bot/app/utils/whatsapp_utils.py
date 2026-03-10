@@ -3,14 +3,13 @@ import logging
 import re
 import time
 
+import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy.orm import DeclarativeBase, selectinload
-import httpx
+
 from ai.run_ai import get_ai_response, get_conversation_history, update_conversation_history, clear_conversation_history
 from models import Business
 from ..config import whatsapp_settings
-from whatsapp_bot.utils import send_typing_indicator
 
 # Global set to store users who have AI disabled
 AI_DISABLED_USERS = set()
@@ -109,6 +108,21 @@ async def download_media(media_url):
         return base64.b64encode(response.content).decode("utf-8")
 
 
+async def send_typing_indicator(message_id: str, phone_number_id: str, access_token: str = None):
+    """
+    Send a typing indicator and mark the message as read.
+    """
+    data = {
+        "messaging_product": "whatsapp",
+        "status": "read",
+        "message_id": message_id,
+        "typing_indicator": {
+            "type": "text"
+        }
+    }
+    await send_message(data, phone_number_id=phone_number_id, access_token=access_token)
+
+
 async def process_whatsapp_message(body, db: AsyncSession):
     """
     Process incoming WhatsApp message and link it to the correct business.
@@ -175,7 +189,12 @@ async def process_whatsapp_message(body, db: AsyncSession):
         data = get_text_message_input(wa_id, error_response)
         await send_message(data, phone_number_id=phone_number_id)
         return
-
+        # ✅ Send typing indicator
+    await send_typing_indicator(
+        message_id=message_id,
+        phone_number_id=phone_number_id,
+        access_token=whatsapp_settings.access_token.get_secret_value()
+    )
     logging.info(f"Processing message for business: {business.name} (ID: {business.id})")
 
     # ✅ Save incoming user message to database
@@ -196,24 +215,23 @@ async def process_whatsapp_message(body, db: AsyncSession):
         return
 
     # ✅ Get recent messages for context (isolated by customer)
-    conversation_history = await get_conversation_history(business.id, wa_id,customer_name=None,db=db)
-
-    # ✅ Send typing indicator
-    # await send_typing_indicator(
-    #     recipient_id=wa_id,
-    #     business_phone_number_id=phone_number_id,
-    #     access_token=whatsapp_settings.access_token.get_secret_value()
-    # )
+    conversation_history = await get_conversation_history(business.id, wa_id, customer_name=None, db=db)
 
     # ✅ Get AI response with business context
     if message_body.lower() == "refresh":
         await clear_conversation_history(db, business_id=business.id, sender=name)
-        conversation_history = []
         response = "History refreshed. How can I help you today?"
     else:
         response = await get_ai_response(message_body, db, conversation_history, business_id=business.id,
                                          user_name=name,
                                          image_data=image_data, image_url=media_url)
+
+    # Process for WhatsApp formatting
+    response = process_text_for_whatsapp(response)
+
+    # Send response back to user
+    data = get_text_message_input(wa_id, response)
+    await send_message(data, phone_number_id=phone_number_id)
 
     # ✅ Save bot response to database
     await update_conversation_history(
@@ -226,13 +244,6 @@ async def process_whatsapp_message(body, db: AsyncSession):
         db=db,
         platform="whatsapp"
     )
-
-    # Process for WhatsApp formatting
-    response = process_text_for_whatsapp(response)
-
-    # Send response back to user
-    data = get_text_message_input(wa_id, response)
-    await send_message(data, phone_number_id=phone_number_id)
 
 
 def is_valid_whatsapp_message(body):
