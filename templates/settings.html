@@ -1,42 +1,99 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="page-header mb-8">
-    <h1 class="text-xl font-bold mb-1">Settings</h1>
-    <p class="text-secondary">Configure your business profile and AI preferences.</p>
+<div class="mb-8 flex justify-between items-center glass-card"
+    style="background-image: linear-gradient(120deg, rgba(0,242,255,0.05) 0%, rgba(0,0,0,0) 100%);">
+    <div class="p-4">
+        <h1 class="page-title text-2xl font-bold mb-2">Settings</h1>
+        <p class="text-secondary text-base">Configure your business profile and AI preferences.</p>
+    </div>
+    <div class="flex gap-4 p-4 hidden sm:flex">
+        <div class="metric-icon"
+            style="background: var(--teal-soft); color: var(--teal-primary); border-color: var(--border-teal);">
+            <i data-lucide="settings"></i>
+        </div>
+    </div>
 </div>
 
-<div class="max-w-2xl">
-    {% if messages %}
-    <div class="mb-6 p-4 border rounded badge-success">
-        {% for message in messages %}
-        <div>{{ message }}</div>
-        {% endfor %}
-    </div>
-    {% endif %}
+<div class="grid-layout grid-cols-2" style="max-width: 1000px; gap: var(--space-8);">
+    <!-- Left Column: Settings Form -->
+    <div class="glass-card">
+        <div class="flex items-center gap-3 mb-6 border-b pb-4" style="border-bottom: 1px solid var(--border-subtle);">
+            <i data-lucide="briefcase" class="text-teal"></i>
+            <h2 class="section-title mb-0 text-lg">Business Configuration</h2>
+        </div>
 
-    <div class="card">
+        {% if messages %}
+        <div class="mb-6 p-4 rounded text-sm font-bold flex items-center gap-3"
+            style="background: rgba(34, 197, 94, 0.1); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3);">
+            <i data-lucide="check-circle" style="width: 18px;"></i>
+            <div>
+                {% for message in messages %}
+                <span>{{ message }}</span><br>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
         <form action="/settings" method="post">
-            <div class="grid grid-cols-2 gap-6 mb-8">
-                <div class="form-group col-span-2">
-                    <label class="block mb-2 font-medium">WhatsApp Phone Number
-                        ID</label>
-                    <input type="text" name="phone_number_id" class="form-control"
-                        value="{{ business.phone_number_id or '' }}" placeholder="Enter your WhatsApp Phone ID">
-                </div>
-
-                <div class="form-group col-span-2">
-                    <label class="block mb-2 font-medium">AI Persona</label>
-                    <textarea name="persona" class="form-control" rows="12"
-                        placeholder="Describe how your AI should behave...">{{ business.persona or '' }}</textarea>
-                </div>
+            <div class="form-group">
+                <label class="form-label flex items-center gap-2">
+                    <i data-lucide="phone" style="width: 14px;"></i> WhatsApp Phone Number ID
+                </label>
+                <input type="text" name="phone_number_id" class="form-control"
+                    value="{{ business.phone_number_id or '' }}" placeholder="Enter your WhatsApp Phone ID">
+                <p class="text-xs text-tertiary mt-1">This ID connects your OmniLabs bot to your Meta WhatsApp business
+                    account.</p>
             </div>
 
-            <div class="d-flex justify-end gap-4 p-6 border-top">
-                <button type="button" class="btn btn-outline">Discard Changes</button>
-                <button type="submit" class="btn btn-primary">Save Settings</button>
+            <div class="form-group mt-6">
+                <label class="form-label flex items-center gap-2">
+                    <i data-lucide="bot" style="width: 14px;"></i> AI Persona Instructions
+                </label>
+                <textarea name="persona" class="form-control"
+                    placeholder="Describe how your AI should behave, its tone, and its strict limitations...">{{ business.persona or '' }}</textarea>
+                <p class="text-xs text-tertiary mt-1">Provide strict system instructions. The AI will strictly follow
+                    these parameters during chats.</p>
+            </div>
+
+            <div class="flex justify-end gap-4 mt-8 pt-6" style="border-top: 1px solid var(--border-subtle);">
+                <button type="button" class="btn btn-outline">
+                    <i data-lucide="rotate-ccw" style="width: 16px;"></i> Discard
+                </button>
+                <button type="submit" class="btn btn-primary">
+                    <i data-lucide="save" style="width: 16px;"></i> Save Settings
+                </button>
             </div>
         </form>
+    </div>
+
+    <!-- Right Column: Info / Help (Demonstrating Dashboard versatility) -->
+    <div class="flex flex-col gap-6">
+        <div class="glass-card" style="background: rgba(0, 242, 255, 0.02);">
+            <div class="flex items-center gap-3 mb-4">
+                <i data-lucide="info" class="text-teal"></i>
+                <h3 class="font-bold text-base m-0">Need Help?</h3>
+            </div>
+            <p class="text-sm text-secondary mb-4">
+                Ensure your <strong>WhatsApp Phone Number ID</strong> perfectly matches the one provided in your Meta
+                Developer console.<br><br>
+                For your <strong>AI Persona</strong>, be as specific as possible. Explicitly state the opening line and
+                product categories you sell.
+            </p>
+            <a href="#" class="action-link text-sm flex items-center gap-2">Read Documentation <i
+                    data-lucide="arrow-right" style="width: 14px;"></i></a>
+        </div>
+
+        <div class="glass-card flex items-center gap-4">
+            <div class="metric-icon"
+                style="background: rgba(234, 179, 8, 0.1); color: #eab308; border-color: rgba(234, 179, 8, 0.3); width: 40px; height: 40px;">
+                <i data-lucide="shield-alert" style="width: 20px;"></i>
+            </div>
+            <div>
+                <h4 class="font-bold text-sm">Active Plan: Pro</h4>
+                <p class="text-xs text-tertiary">All AI features unlocked.</p>
+            </div>
+        </div>
     </div>
 </div>
 {% endblock %}

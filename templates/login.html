@@ -4,60 +4,206 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LOGIN | OMNILABS</title>
+    <title>Login | OmniLabs</title>
+    <!-- CSS Dependencies -->
+    <link rel="stylesheet" href="{{ url_for('static', path='css/variables.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', path='css/main.css') }}">
+    <script src="https://unpkg.com/lucide@latest"></script>
     <style>
-        body.auth-page {
-            background-color: #f8f9fa;
-            /* Subtle contrast background */
+        .auth-wrapper {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: var(--space-6);
+            position: relative;
+            background-color: var(--bg-app);
+            background-image: var(--bg-gradient);
+            background-attachment: fixed;
+            font-family: var(--font-mono);
+            color: var(--text-primary);
         }
 
         .auth-card {
-            background: var(--base-white);
-            border: 2px solid var(--base-black);
-            box-shadow: 16px 16px 0px var(--base-black);
-            margin: auto;
-            /* Ensure centering in flex */
+            background: var(--bg-card);
+            backdrop-filter: var(--glass-blur);
+            -webkit-backdrop-filter: var(--glass-blur);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-lg);
+            padding: var(--space-8);
+            width: 100%;
+            max-width: 440px;
+            box-shadow: var(--shadow-hover);
+            position: relative;
+            overflow: hidden;
+            z-index: 10;
+        }
+
+        /* Glowing accent trace at the top of the login box */
+        .auth-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background: linear-gradient(90deg, transparent, var(--teal-primary), transparent);
+        }
+
+        .auth-logo {
+            height: 48px;
+            margin-bottom: var(--space-4);
+        }
+
+        .auth-header {
+            text-align: center;
+            margin-bottom: var(--space-8);
+        }
+
+        .auth-title {
+            font-size: 1.5rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: var(--space-2);
+        }
+
+        .auth-subtitle {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            font-weight: 600;
+        }
+
+        .error-banner {
+            background: rgba(248, 113, 113, 0.1);
+            color: #f87171;
+            border: 1px solid rgba(248, 113, 113, 0.3);
+            padding: var(--space-3);
+            border-radius: var(--radius-md);
+            font-size: 0.85rem;
+            font-weight: 700;
+            text-align: center;
+            margin-bottom: var(--space-6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: var(--space-2);
+        }
+
+        .input-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .input-wrapper i {
+            position: absolute;
+            left: 16px;
+            color: var(--text-tertiary);
+            width: 18px;
+            height: 18px;
+        }
+
+        .input-wrapper .form-control {
+            padding-left: 44px;
+            /* Space for the icon */
+        }
+
+        .form-control:focus+i,
+        .form-control:focus-within~i {
+            color: var(--teal-primary);
+        }
+
+        /* Mobile Optimization for Login */
+        @media (max-width: 600px) {
+            .auth-wrapper {
+                padding: var(--space-4);
+            }
+
+            .auth-card {
+                padding: var(--space-6);
+            }
+
+            .auth-header {
+                margin-bottom: var(--space-6);
+            }
         }
     </style>
 </head>
 
-<body class="auth-page d-flex align-center justify-center min-vh-100 p-4">
-    <div class="auth-card max-w-md w-full p-12">
-        <div class="text-center mb-10">
-            <img src="{{ url_for('static', path='assets/transp background 1, omni.png') }}" alt="OmniLabs Logo"
-                class="auth-logo">
-            <h2 class="text-xl font-bold uppercase mb-2">SYSTEM ACCESS</h2>
-            <p class="text-xs font-bold opacity-70 uppercase">PROCEED WITH CREDENTIALS</p>
+<body>
+    <!-- Theme Script initialization to prevent flash -->
+    <script>
+        const currentTheme = localStorage.getItem('theme');
+        if (currentTheme === 'light' || (!currentTheme && window.matchMedia('(prefers-color-scheme: light)').matches)) {
+            document.documentElement.classList.add('light-mode');
+        }
+    </script>
+
+    <div class="auth-wrapper">
+        <!-- Floating decorative glowing orbs behind the card (optional neat effect) -->
+        <div
+            style="position: absolute; top: 20%; left: 30%; width: 300px; height: 300px; background: var(--teal-soft); filter: blur(100px); border-radius: 50%; pointer-events: none; z-index: 1;">
+        </div>
+        <div
+            style="position: absolute; bottom: 20%; right: 30%; width: 250px; height: 250px; background: rgba(0,0,0,0.5); filter: blur(80px); border-radius: 50%; pointer-events: none; z-index: 1;">
         </div>
 
-        {% if error %}
-        <div class="mb-8 p-3 border-2 border-black bg-black text-white text-center text-xs font-bold uppercase">
-            {{ error }}
-        </div>
-        {% endif %}
-
-        <form action="/login" method="post" class="d-flex flex-column gap-6">
-            <div class="form-group mb-0">
-                <label class="form-label" for="username">OPERATOR ID</label>
-                <input type="text" id="username" name="username" class="form-control" placeholder="ENTER USERNAME..."
-                    required autocomplete="username">
+        <div class="auth-card">
+            <div class="auth-header">
+                <img src="{{ url_for('static', path='assets/transp background 1, omni.png') }}" alt="OmniLabs Logo"
+                    class="auth-logo">
+                <h1 class="auth-title">System Access</h1>
+                <p class="auth-subtitle">Proceed with operator credentials</p>
             </div>
 
-            <div class="form-group mb-4">
-                <label class="form-label" for="password">ACCESS KEY</label>
-                <input type="password" id="password" name="password" class="form-control"
-                    placeholder="ENTER PASSWORD..." required autocomplete="current-password">
+            {% if error %}
+            <div class="error-banner">
+                <i data-lucide="alert-circle" style="width: 16px; height: 16px;"></i>
+                {{ error }}
             </div>
+            {% endif %}
 
-            <button type="submit" class="btn btn-primary w-full">INITIALIZE SESSION</button>
-        </form>
+            <form action="/login" method="post" class="flex flex-col gap-6">
+                <div class="form-group mb-0">
+                    <label class="form-label mb-2" for="username">OPERATOR ID</label>
+                    <div class="input-wrapper">
+                        <i data-lucide="user"></i>
+                        <input type="text" id="username" name="username" class="form-control"
+                            placeholder="Enter username..." required autocomplete="username">
+                    </div>
+                </div>
 
-        <div class="mt-8 text-center text-xs font-bold">
-            <span class="opacity-70 uppercase">UNREGISTERED OPERATOR?</span>
-            <a href="/signup" class="text-brand underline uppercase ml-1">REGISTER HERE</a>
+                <div class="form-group mb-2">
+                    <div class="flex justify-between items-center mb-2">
+                        <label class="form-label mb-0" for="password">ACCESS KEY</label>
+                        <a href="#" class="action-link text-xs" tabindex="-1">Forgot Key?</a>
+                    </div>
+                    <div class="input-wrapper">
+                        <i data-lucide="lock"></i>
+                        <input type="password" id="password" name="password" class="form-control"
+                            placeholder="Enter password..." required autocomplete="current-password">
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary w-full mt-4" style="padding: 14px;">
+                    INITIALIZE SESSION <i data-lucide="arrow-right" style="width: 18px;"></i>
+                </button>
+            </form>
+
+            <div class="mt-8 text-center"
+                style="border-top: 1px solid var(--border-subtle); padding-top: var(--space-6);">
+                <span class="text-sm font-bold text-secondary uppercase">Unregistered Operator?</span>
+                <br>
+                <a href="/signup" class="action-link text-sm uppercase mt-2 inline-block">Request Access Here</a>
+            </div>
         </div>
     </div>
+
+    <script>
+        // Initialize Icons
+        lucide.createIcons();
+    </script>
 </body>
 
 </html>

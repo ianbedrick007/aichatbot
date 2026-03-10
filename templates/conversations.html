@@ -190,8 +190,8 @@
         async function selectCustomer(id, name) {
             currentCustomerId = id;
             document.querySelectorAll('.wa-chat-item').forEach(el => el.classList.remove('active'));
-            loadMessages(id);
             renderChatWindow(name);
+            await loadMessages(id);
 
             if (refreshInterval) clearInterval(refreshInterval);
             refreshInterval = setInterval(() => loadMessages(id), 5000);
@@ -209,7 +209,7 @@
                 const html = data.messages.map(m => `
                     <div class="wa-msg-bubble ${m.is_bot ? 'sent' : 'received'}">
                         ${m.text}
-                        <span class="wa-msg-time">${m.timestamp.split(' ')[1].substring(0, 5)}</span>
+                        <span class="wa-msg-time">${m.timestamp}</span>
                     </div>
                 `).join('');
 

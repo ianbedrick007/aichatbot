@@ -4,189 +4,239 @@
 
 {% block extra_css %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<style>
-    .stat-cards-horizontal {
-        display: flex;
-        gap: var(--space-6);
-        flex-wrap: wrap;
-        /* Fallback for small screens */
-    }
-
-    .stat-card-total {
-        flex: 1;
-        min-width: 200px;
-        aspect-ratio: 1 / 1;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        text-align: center;
-        background: var(--base-white);
-        border: 2px solid var(--base-black);
-        padding: var(--space-6);
-        box-shadow: 6px 6px 0px var(--base-black);
-        transition: var(--transition-fast);
-    }
-
-    .stat-card-total:hover {
-        transform: translate(-2px, -2px);
-        box-shadow: 8px 8px 0px var(--base-black);
-    }
-
-    .stat-card-total-value {
-        font-size: 2.5rem;
-        font-weight: 900;
-        color: var(--base-black);
-        margin: var(--space-2) 0;
-    }
-
-    .stat-card-total-label {
-        font-size: 0.75rem;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.1em;
-    }
-
-    .analytics-grid {
-        display: grid;
-        grid-template-columns: 2fr 1fr;
-        gap: var(--space-8);
-    }
-
-    .chart-container {
-        position: relative;
-        height: 300px;
-        width: 100%;
-    }
-</style>
 {% endblock %}
 
 {% block content %}
-<div class="dashboard-header d-flex justify-between align-center mb-12">
-    <div>
-        <h1 class="text-xl font-bold mb-1">BUSINESS COMMAND CENTER</h1>
-        <p class="text-secondary tracking-widest uppercase text-xs">AUTHORIZED ACCESS ONLY : {{ business.name|upper }}
-        </p>
+<!-- Welcome Banner Area -->
+<div class="mb-8 flex justify-between items-center glass-card"
+    style="background-image: linear-gradient(120deg, rgba(0,242,255,0.05) 0%, rgba(0,0,0,0) 100%);">
+    <div class="p-4">
+        <h1 class="page-title text-2xl font-bold mb-2">Welcome, {{ business.name if business else 'Administrator' }}!
+        </h1>
+        <p class="text-secondary text-base">Here's your account overview and recent activities.</p>
     </div>
-    <div class="header-actions d-flex gap-4">
-        <a href="/chat" class="btn btn-outline d-flex align-center gap-2">
-            <i data-lucide="terminal" class="icon-sm"></i> AI CHAT
+    <div class="flex gap-4 p-4 hidden sm:flex">
+        <a href="/chat" class="btn btn-outline">
+            <i data-lucide="bot" style="width: 18px;"></i> AI CHAT
         </a>
-        <a href="/products" class="btn btn-primary d-flex align-center gap-2">
-            <i data-lucide="plus" class="icon-sm"></i> ADD NEW PRODUCT
+        <a href="/products" class="btn btn-primary">
+            <i data-lucide="plus" style="width: 18px;"></i> ADD PRODUCT
         </a>
     </div>
 </div>
 
-<div class="stat-cards-horizontal mb-12">
-    <!-- AI Credits -->
-    <div class="stat-card-total">
-        <div class="stat-icon mb-4"><i data-lucide="zap" class="icon-md"></i></div>
-        <div class="stat-card-total-label">AI CREDITS</div>
-        <div class="stat-card-total-value">{{ ai_credits|default('100.0') }}</div>
-        <div class="text-xs opacity-50">COMPUTE BUDGET</div>
-    </div>
-
-    <!-- Products -->
-    <div class="stat-card-total">
-        <div class="stat-icon mb-4"><i data-lucide="package" class="icon-md"></i></div>
-        <div class="stat-card-total-label">PRODUCTS</div>
-        <div class="stat-card-total-value">{{ products_count }}</div>
-        <div class="text-xs opacity-50">LIVE CATALOG</div>
-    </div>
-
-    <!-- Orders -->
-    <div class="stat-card-total">
-        <div class="stat-icon mb-4"><i data-lucide="shopping-bag" class="icon-md"></i></div>
-        <div class="stat-card-total-label">TOTAL ORDERS</div>
-        <div class="stat-card-total-value">{{ orders_count }}</div>
-        <div class="text-xs opacity-50">SALES VOLUME</div>
-    </div>
-
-    <!-- Invoices -->
-    <div class="stat-card-total">
-        <div class="stat-icon mb-4"><i data-lucide="file-text" class="icon-md"></i></div>
-        <div class="stat-card-total-label">INVOICES</div>
-        <div class="stat-card-total-value">{{ invoices_count }}</div>
-        <div class="text-xs opacity-50">FINANCIAL FLOW</div>
-    </div>
-</div>
-
-<div class="analytics-grid mb-12">
-    <section class="card">
-        <div class="d-flex justify-between align-center mb-6">
-            <h3 class="text-lg font-bold">SALES REVENUE TREND</h3>
-            <div class="badge badge-success">30 DAY METRIC</div>
+<!-- Stat Cards -->
+<div class="grid-layout grid-cols-4 mb-8">
+    <div class="glass-card metric-card">
+        <div class="metric-info">
+            <span class="metric-label text-xs">Total Products</span>
+            <span class="metric-value text-teal">{{ products_count }}</span>
         </div>
-        <div class="chart-container">
+        <div class="metric-icon">
+            <i data-lucide="package"></i>
+        </div>
+    </div>
+
+    <div class="glass-card metric-card">
+        <div class="metric-info">
+            <span class="metric-label text-xs">Total Orders</span>
+            <span class="metric-value text-blue-400">{{ orders_count }}</span>
+        </div>
+        <div class="metric-icon" style="color: #60a5fa; border-color: #3b82f6; background: rgba(59, 130, 246, 0.1);">
+            <i data-lucide="shopping-cart"></i>
+        </div>
+    </div>
+
+    <div class="glass-card metric-card">
+        <div class="metric-info">
+            <span class="metric-label text-xs">Invoices sent</span>
+            <span class="metric-value text-green-400">{{ invoices_count }}</span>
+        </div>
+        <div class="metric-icon" style="color: #4ade80; border-color: #22c55e; background: rgba(34, 197, 94, 0.1);">
+            <i data-lucide="file-text"></i>
+        </div>
+    </div>
+
+    <div class="glass-card metric-card">
+        <div class="metric-info">
+            <span class="metric-label text-xs">AI Credits</span>
+            <span class="metric-value text-yellow-500">{{ ai_credits|default('100.0') }}</span>
+        </div>
+        <div class="metric-icon" style="color: #eab308; border-color: #ca8a04; background: rgba(234, 179, 8, 0.1);">
+            <i data-lucide="zap"></i>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Section -->
+<div class="grid-layout grid-cols-2 mb-8" style="grid-template-columns: 2fr 1fr;">
+    <!-- Sales Revenue Trend (Line Chart) -->
+    <div class="glass-card">
+        <div class="chart-header">
+            <h3 class="section-title mb-0">Sales Revenue Trend</h3>
+            <select class="btn btn-sm text-xs bg-transparent text-secondary border-subtle outline-none"
+                style="padding: 4px 10px;">
+                <option>Monthly</option>
+                <option>Weekly</option>
+                <option>Yearly</option>
+            </select>
+        </div>
+        <div class="chart-wrapper">
             <canvas id="salesTrendChart"></canvas>
         </div>
-    </section>
+    </div>
 
-    <section class="card">
-        <div class="d-flex justify-between align-center mb-6">
-            <h3 class="text-lg font-bold">ORDER SEGMENTATION</h3>
+    <!-- Order Segmentation (Doughnut Chart) -->
+    <div class="glass-card">
+        <div class="chart-header">
+            <h3 class="section-title mb-0">Order Segmentation</h3>
         </div>
-        <div class="chart-container">
+        <div class="chart-wrapper">
             <canvas id="orderSegmentationChart"></canvas>
         </div>
-    </section>
+    </div>
+</div>
+
+<!-- Recent Orders Section -->
+<div class="glass-card">
+    <div class="flex justify-between items-center mb-6">
+        <h3 class="section-title mb-0">Recent Orders</h3>
+        <a href="#" class="action-link text-xs">View all Orders <i data-lucide="arrow-up-right"
+                style="width: 14px; display:inline;"></i></a>
+    </div>
+    <div class="table-container">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Order ID</th>
+                    <th>Product / Service</th>
+                    <th>Date</th>
+                    <th>Status</th>
+                    <th>Amount</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>#ORD-8930</td>
+                    <td>OmniAutomation Flow</td>
+                    <td>03/10/24</td>
+                    <td><span class="status-badge status-completed">Completed</span></td>
+                    <td>$450.00</td>
+                    <td><a href="#" class="action-link text-xs">Details</a></td>
+                </tr>
+                <tr>
+                    <td>#ORD-8929</td>
+                    <td>LLM Train Request</td>
+                    <td>03/09/24</td>
+                    <td><span class="status-badge status-pending">Pending</span></td>
+                    <td>$125.50</td>
+                    <td><a href="#" class="action-link text-xs">Details</a></td>
+                </tr>
+                <tr>
+                    <td>#ORD-8928</td>
+                    <td>Basic Support Plan</td>
+                    <td>03/08/24</td>
+                    <td><span class="status-badge status-completed">Completed</span></td>
+                    <td>$99.00</td>
+                    <td><a href="#" class="action-link text-xs">Details</a></td>
+                </tr>
+                <tr>
+                    <td>#ORD-8927</td>
+                    <td>Custom Model Deployment</td>
+                    <td>03/06/24</td>
+                    <td><span class="status-badge status-cancelled">Cancelled</span></td>
+                    <td>$800.00</td>
+                    <td><a href="#" class="action-link text-xs">Details</a></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
     document.addEventListener('DOMContentLoaded', () => {
-        // Sales Trend Chart
+        function getComputedCSSVar(varName) {
+            return getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+        }
+
+        let textColor = getComputedCSSVar('--text-secondary') || 'rgba(255, 255, 255, 0.5)';
+        Chart.defaults.color = textColor;
+        Chart.defaults.font.family = '"Courier New", Courier, monospace';
+
+        // 1. Sales Trend Chart (Line Chart)
         const ctxTrend = document.getElementById('salesTrendChart').getContext('2d');
-        new Chart(ctxTrend, {
+
+        const gradientDark = ctxTrend.createLinearGradient(0, 0, 0, 300);
+        gradientDark.addColorStop(0, 'rgba(0, 242, 255, 0.3)');
+        gradientDark.addColorStop(1, 'rgba(0, 242, 255, 0)');
+
+        const gradientLight = ctxTrend.createLinearGradient(0, 0, 0, 300);
+        gradientLight.addColorStop(0, 'rgba(0, 186, 196, 0.3)');
+        gradientLight.addColorStop(1, 'rgba(0, 186, 196, 0)');
+
+        const isLightMode = document.documentElement.classList.contains('light-mode');
+
+        const salesTrendChart = new Chart(ctxTrend, {
             type: 'line',
             data: {
-                labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4'],
+                labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul'],
                 datasets: [{
-                    label: 'Revenue (USD)',
-                    data: [1200, 1900, 3000, 5000],
-                    borderColor: '#00f2ff',
-                    backgroundColor: 'rgba(0, 242, 255, 0.1)',
-                    borderWidth: 3,
+                    label: 'Revenue',
+                    data: [1500, 2300, 3400, 2800, 4500, 3900, 5200],
+                    borderColor: getComputedCSSVar('--teal-primary'),
+                    backgroundColor: isLightMode ? gradientLight : gradientDark,
+                    borderWidth: 2,
                     fill: true,
                     tension: 0.4,
-                    pointBackgroundColor: '#000',
-                    pointBorderColor: '#00f2ff',
-                    pointBorderWidth: 2
+                    pointBackgroundColor: getComputedCSSVar('--bg-app'),
+                    pointBorderColor: getComputedCSSVar('--teal-primary'),
+                    pointBorderWidth: 2,
+                    pointRadius: 4,
+                    pointHoverRadius: 6
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
-                    legend: { display: false }
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        titleColor: '#00f2ff',
+                        padding: 10,
+                        borderColor: 'rgba(0, 242, 255, 0.3)',
+                        borderWidth: 1
+                    }
                 },
                 scales: {
                     y: {
                         beginAtZero: true,
-                        grid: { color: 'rgba(0,0,0,0.05)' },
-                        ticks: { font: { family: 'Courier New' } }
+                        grid: { color: getComputedCSSVar('--border-subtle') },
+                        ticks: { callback: function (value) { return '$' + value; }, color: textColor }
                     },
                     x: {
                         grid: { display: false },
-                        ticks: { font: { family: 'Courier New' } }
+                        ticks: { color: textColor }
                     }
                 }
             }
         });
 
-        // Order Segmentation Chart
+        // 2. Order Segmentation Chart (Doughnut Chart)
         const ctxSeg = document.getElementById('orderSegmentationChart').getContext('2d');
-        new Chart(ctxSeg, {
+        const orderSegChart = new Chart(ctxSeg, {
             type: 'doughnut',
             data: {
                 labels: ['Completed', 'Pending', 'Cancelled'],
                 datasets: [{
                     data: [65, 25, 10],
-                    backgroundColor: ['#00f2ff', '#000000', '#f8f9fa'],
-                    borderColor: '#000000',
-                    borderWidth: 2
+                    backgroundColor: ['#00f2ff', '#facc15', '#f87171'],
+                    borderColor: getComputedCSSVar('--bg-app'),
+                    borderWidth: 3,
+                    hoverOffset: 4
                 }]
             },
             options: {
@@ -195,11 +245,45 @@
                 plugins: {
                     legend: {
                         position: 'bottom',
-                        labels: { font: { family: 'Courier New', weight: 'bold' } }
+                        labels: {
+                            padding: 20,
+                            usePointStyle: true,
+                            pointStyle: 'rectRounded',
+                            color: textColor
+                        }
                     }
                 },
-                cutout: '70%'
+                cutout: '75%',
+                layout: {
+                    padding: 10
+                }
             }
+        });
+
+        // Listen for Theme Changes dynamically
+        window.addEventListener('themeChanged', () => {
+            const isLight = document.documentElement.classList.contains('light-mode');
+            const newTextColor = getComputedCSSVar('--text-secondary');
+            const bgApp = getComputedCSSVar('--bg-app');
+            const teal = getComputedCSSVar('--teal-primary');
+            const subtle = getComputedCSSVar('--border-subtle');
+
+            Chart.defaults.color = newTextColor;
+
+            // Update Line Chart
+            salesTrendChart.data.datasets[0].backgroundColor = isLight ? gradientLight : gradientDark;
+            salesTrendChart.data.datasets[0].borderColor = teal;
+            salesTrendChart.data.datasets[0].pointBorderColor = teal;
+            salesTrendChart.data.datasets[0].pointBackgroundColor = bgApp;
+            salesTrendChart.options.scales.x.ticks.color = newTextColor;
+            salesTrendChart.options.scales.y.ticks.color = newTextColor;
+            salesTrendChart.options.scales.y.grid.color = subtle;
+            salesTrendChart.update();
+
+            // Update Doughnut Chart
+            orderSegChart.data.datasets[0].borderColor = bgApp;
+            orderSegChart.options.plugins.legend.labels.color = newTextColor;
+            orderSegChart.update();
         });
     });
 </script>

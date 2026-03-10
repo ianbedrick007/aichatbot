@@ -27,18 +27,18 @@ logger = logging.getLogger(__name__)
 api_key = os.getenv("OPENAI_API_KEY")
 ai_model = os.getenv("OPEN_ROUTER_MODEL")
 
-_client = None
+client: AsyncOpenAI | None = None
 
 
-def _get_client():
-    """Lazily initialize the OpenAI client to avoid crashing at import time."""
-    global _client
-    if _client is None:
-        _client = AsyncOpenAI(
-            base_url="https://openrouter.ai/api/v1",
-            api_key=api_key
-        )
-    return _client
+def startup_ai_client():
+    """Initialize the AI client. This should be called at application startup."""
+    global client
+    logger.info("Initializing OpenAI client...")
+    client = AsyncOpenAI(
+        base_url="https://openrouter.ai/api/v1",
+        api_key=api_key
+    )
+    logger.info("OpenAI client initialized.")
 
 
 # ✅ Store business_id as a context variable
@@ -208,7 +208,11 @@ async def get_ai_response(user_input, db, conversation_history=None, business_id
 
     try:
         # 2. First model call
-        completion = await _get_client().chat.completions.create(
+        if not client:
+            logger.error("AI client is not initialized. Make sure to run startup_ai_client() on app startup.")
+            return "Sorry, the AI service is not configured correctly."
+
+        completion = await client.chat.completions.create(
             model=ai_model,
             messages=messages,
             tools=tools,
@@ -258,7 +262,7 @@ async def get_ai_response(user_input, db, conversation_history=None, business_id
             messages.extend(tool_outputs)
 
             # 5. Second API call with all function results
-            second_completion = await _get_client().chat.completions.create(
+            second_completion = await client.chat.completions.create(
                 model=ai_model,
                 messages=messages,
                 tools=tools,

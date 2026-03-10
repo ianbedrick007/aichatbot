@@ -222,8 +222,7 @@ async def process_whatsapp_message(body, db: AsyncSession):
         await clear_conversation_history(db, business_id=business.id, sender=name)
         response = "History refreshed. How can I help you today?"
     else:
-        response = await get_ai_response(message_body, db, conversation_history, business_id=business.id,
-                                         user_name=name,
+        response = await get_ai_response(message_body, db, conversation_history, business_id=business.id, user_name=name,
                                          image_data=image_data, image_url=media_url)
 
     # Process for WhatsApp formatting

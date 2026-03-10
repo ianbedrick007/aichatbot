@@ -17,7 +17,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 from werkzeug.security import generate_password_hash, check_password_hash
 
-from ai.run_ai import get_ai_response, update_conversation_history, get_conversation_history
+from ai.run_ai import get_ai_response, update_conversation_history, get_conversation_history, startup_ai_client
 from auth import create_access_token
 from database import get_db, engine, get_current_user, get_current_business
 from models import Business, User, Base, Product, Message, Mailinglist
@@ -35,6 +35,7 @@ async def lifespan(_app: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)  # Create database tables
         configure_logging()  # Configure logging for the WhatsApp bot
+        startup_ai_client()
     yield
     # Shutdown
     await engine.dispose()

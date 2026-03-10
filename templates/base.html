@@ -5,94 +5,97 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}OmniLabs{% endblock %}</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- CSS Dependencies -->
     <link rel="stylesheet" href="{{ url_for('static', path='css/variables.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', path='css/base.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', path='css/layout.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', path='css/components.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', path='css/utilities.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', path='css/responsive.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='css/main.css') }}">
     <!-- Production Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
     {% block extra_css %}{% endblock %}
 </head>
 
-<body class="dashboard-body">
+<body class="dashboard-wrapper">
     <!-- Sidebar -->
     <aside class="sidebar" id="sidebar">
         <div class="sidebar-header">
-            <a href="/" class="sidebar-logo">
-                <img src="{{ url_for('static', path='assets/transp background 1, omni.png') }}" alt="OmniLabs Logo"
-                    class="sidebar-logo-img">
-                <span class="logo-text">OmniLabs</span>
+            <a href="/" class="brand-logo">
+                <img src="{{ url_for('static', path='assets/transp background 1, omni.png') }}" alt="Logo"
+                    style="height: 32px;">
+                Omni<span>Labs</span>
             </a>
         </div>
 
-        <nav class="sidebar-nav">
-            <div class="nav-section">
-                <p class="nav-section-title">Main</p>
-                <a href="/" class="nav-link {% if request.url.path == '/' %}active{% endif %}">
-                    <i data-lucide="layout-dashboard" class="nav-icon"></i> Dashboard
-                </a>
-                <a href="/products" class="nav-link {% if request.url.path == '/products' %}active{% endif %}">
-                    <i data-lucide="package" class="nav-icon"></i> Products
-                </a>
-                <a href="/conversations"
-                    class="nav-link {% if request.url.path == '/conversations' %}active{% endif %}">
-                    <i data-lucide="message-square" class="nav-icon"></i> Conversations
-                </a>
-                <a href="/chat" class="nav-link {% if request.url.path == '/chat' %}active{% endif %}">
-                    <i data-lucide="bot" class="nav-icon"></i> AI Chat
-                </a>
+        <nav class="sidebar-nav mt-6">
+            <div class="mb-2 text-xs text-muted" style="padding: 0 var(--space-4); text-transform: uppercase;">Main Menu
             </div>
 
-            <div class="nav-section">
-                <p class="nav-section-title">System</p>
-                <a href="/settings" class="nav-link {% if request.url.path == '/settings' %}active{% endif %}">
-                    <i data-lucide="settings" class="nav-icon"></i> Settings
-                </a>
-            </div>
+            <a href="/" class="nav-item {% if request.url.path == '/' %}active{% endif %}">
+                <i data-lucide="layout-dashboard" class="nav-icon"></i> Dashboard
+            </a>
+            <a href="/products" class="nav-item {% if request.url.path == '/products' %}active{% endif %}">
+                <i data-lucide="package" class="nav-icon"></i> Products
+            </a>
+            <a href="/conversations" class="nav-item {% if request.url.path == '/conversations' %}active{% endif %}">
+                <i data-lucide="message-square" class="nav-icon"></i> Conversations
+            </a>
+            <a href="/chat" class="nav-item {% if request.url.path == '/chat' %}active{% endif %}">
+                <i data-lucide="bot" class="nav-icon"></i> AI Chat
+            </a>
+
+            <div class="mt-6 mb-2 text-xs text-muted" style="padding: 0 var(--space-4); text-transform: uppercase;">
+                System</div>
+
+            <a href="/settings" class="nav-item {% if request.url.path == '/settings' %}active{% endif %}">
+                <i data-lucide="settings" class="nav-icon"></i> Settings
+            </a>
+
+            <div style="flex-grow: 1;"></div> <!-- Spacer to push logout to bottom -->
+
+            <a href="/logout" class="nav-item text-error mt-4" style="color: #f87171;">
+                <i data-lucide="log-out" class="nav-icon"></i> Logout
+            </a>
         </nav>
-
-        <div class="sidebar-footer">
-            <div class="user-profile">
-                <div class="user-avatar">{{ business.name[0] if business else 'U' }}</div>
-                <div class="user-info">
-                    <p class="user-name">{{ business.name if business else 'User' }}</p>
-                    <p class="user-plan">Pro Plan</p>
-                </div>
-            </div>
-            <a href="/logout" class="logout-btn">
-                <i data-lucide="log-out" class="icon-sm"></i> Logout
-            </a>
-        </div>
     </aside>
 
     <!-- Main Content Area -->
-    <div class="app-shell">
+    <div class="main-content">
         <!-- Top Bar -->
         <header class="topbar">
-            <div class="topbar-left">
-                <button class="icon-btn mobile-only" title="Toggle Sidebar" id="menu-btn" aria-label="Open Menu">
-                    <i data-lucide="menu" class="icon-md"></i>
+            <div class="flex items-center gap-4">
+                <button class="action-icon mobile-only block lg:hidden" title="Toggle Sidebar" id="menu-btn"
+                    aria-label="Open Menu">
+                    <i data-lucide="menu"></i>
                 </button>
-                <div class="topbar-search">
-                    <i data-lucide="search" class="search-icon"></i>
-                    <input type="text" placeholder="Search anything..." aria-label="Search">
+                <div class="search-bar">
+                    <i data-lucide="search" class="text-tertiary" style="width: 18px;"></i>
+                    <input type="text" placeholder="Search..." aria-label="Search">
                 </div>
             </div>
+
             <div class="topbar-actions">
-                <a href="/settings" class="btn btn-sm btn-primary">Upgrade</a>
+                <button class="action-icon" id="theme-toggle" title="Toggle Theme" aria-label="Toggle Theme">
+                    <i data-lucide="sun" id="theme-icon-light" style="display:none;"></i>
+                    <i data-lucide="moon" id="theme-icon-dark"></i>
+                </button>
+                <button class="action-icon" title="Notifications" aria-label="Notifications"><i
+                        data-lucide="bell"></i></button>
+
+                <div class="profile-dropdown">
+                    <div class="avatar flex items-center justify-center font-bold"
+                        style="background: var(--teal-soft); border-color: var(--teal-primary); color: var(--teal-primary);">
+                        {{ business.name[0] if business else 'U' }}
+                    </div>
+                    <div class="flex-col hidden sm:flex">
+                        <span class="text-sm font-bold">{{ business.name if business else 'User' }}</span>
+                        <span class="text-xs text-teal">Pro Plan</span>
+                    </div>
+                    <i data-lucide="chevron-down" class="text-tertiary" style="width: 16px;"></i>
+                </div>
             </div>
         </header>
 
         <!-- Page Content -->
-        <main class="page-content">
-            <div class="content-container">
-                {% block content %}{% endblock %}
-            </div>
+        <main class="page-container">
+            {% block content %}{% endblock %}
         </main>
     </div>
 
@@ -104,13 +107,15 @@
         const sidebar = document.getElementById('sidebar');
         const menuBtn = document.getElementById('menu-btn');
 
-        menuBtn.addEventListener('click', () => {
-            sidebar.classList.toggle('sidebar-visible');
-        });
+        if (menuBtn) {
+            menuBtn.addEventListener('click', () => {
+                sidebar.classList.toggle('sidebar-visible');
+            });
+        }
 
         // Close sidebar when clicking outside of it on mobile
         document.addEventListener('click', (event) => {
-            if (window.innerWidth < 1024) {
+            if (window.innerWidth < 1024 && sidebar && menuBtn) {
                 const isClickInsideSidebar = sidebar.contains(event.target);
                 const isClickOnMenuBtn = menuBtn.contains(event.target);
 
@@ -119,6 +124,43 @@
                 }
             }
         });
+
+        // Theme Toggle Logic
+        const themeToggleBtn = document.getElementById('theme-toggle');
+        const themeIconLight = document.getElementById('theme-icon-light');
+        const themeIconDark = document.getElementById('theme-icon-dark');
+        const rootElement = document.documentElement;
+
+        function setTheme(isLight) {
+            if (isLight) {
+                rootElement.classList.add('light-mode');
+                if (themeIconLight) themeIconLight.style.display = 'block';
+                if (themeIconDark) themeIconDark.style.display = 'none';
+                localStorage.setItem('theme', 'light');
+            } else {
+                rootElement.classList.remove('light-mode');
+                if (themeIconLight) themeIconLight.style.display = 'none';
+                if (themeIconDark) themeIconDark.style.display = 'block';
+                localStorage.setItem('theme', 'dark');
+            }
+            // Dispatch a custom event for charts to listen to
+            window.dispatchEvent(new Event('themeChanged'));
+        }
+
+        // Initialize Theme
+        const currentTheme = localStorage.getItem('theme');
+        if (currentTheme === 'light' || (!currentTheme && window.matchMedia('(prefers-color-scheme: light)').matches)) {
+            setTheme(true);
+        } else {
+            setTheme(false);
+        }
+
+        if (themeToggleBtn) {
+            themeToggleBtn.addEventListener('click', () => {
+                const isLight = !rootElement.classList.contains('light-mode');
+                setTheme(isLight);
+            });
+        }
     </script>
     {% block extra_js %}{% endblock %}
 </body>
