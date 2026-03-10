@@ -1,10 +1,9 @@
 import asyncio
 import contextvars
-import logging
 import inspect
 import json
+import logging
 import os
-import traceback
 
 from dotenv import load_dotenv
 from openai import AsyncOpenAI
@@ -245,7 +244,8 @@ async def get_ai_response(user_input, db, conversation_history=None, business_id
 
                 # Log result safely (truncate if too long)
                 result_str = str(function_result)
-                logger.info(f"Tool Result: {result_str[:200]}..." if len(result_str) > 200 else f"Tool Result: {result_str}")
+                logger.info(
+                    f"Tool Result: {result_str[:200]}..." if len(result_str) > 200 else f"Tool Result: {result_str}")
 
                 return {
                     "role": "tool",
@@ -321,11 +321,14 @@ async def update_conversation_history(db, business_id, text, sender, customer_id
 
 async def clear_conversation_history(db, business_id, sender):
     """Delete all messages associated with a specific business."""
+    from sqlalchemy import and_
     results = await db.execute(
         delete(Message).where(
-            Message.business_id == business_id,
-            Message.sender == sender
+            and_(
+                Message.business_id == business_id,
+                Message.sender == sender
+            )
         )
     )
-    print(f"{results.rowcount} messages were deleted by {sender}")
+    logger.info(f"{results.rowcount} messages were deleted by {sender}")
     await db.commit()
