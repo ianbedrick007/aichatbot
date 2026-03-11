@@ -1,5 +1,5 @@
 from __future__ import annotations
-
+import random
 from datetime import datetime
 
 from pgvector.sqlalchemy import Vector
@@ -119,6 +119,7 @@ class Order(Base):
     amount: Mapped[float] = mapped_column(Float, nullable=False)
     status: Mapped[str] = mapped_column(String(50), default='pending')  # pending, completed, cancelled
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    reference: Mapped[str] = mapped_column( nullable=True, unique=True)
 
     business: Mapped["Business"] = relationship('Business', back_populates='orders', lazy=True)
 

@@ -23,6 +23,7 @@ from database import get_db, engine, get_current_user, get_current_business
 from models import Business, User, Base, Product, Message, Mailinglist
 from routers import products, users, conversations, chat
 from whatsapp_bot.app import router as whatsapp_router, configure_logging
+from payment.payment import router as payment_router
 
 
 # Define the application lifespan
@@ -83,6 +84,7 @@ templates = Jinja2Templates(directory="templates")
 app.include_router(users.router, prefix="/api/users", tags=["users"])
 app.include_router(products.router, prefix="", tags=["posts"])
 app.include_router(whatsapp_router, prefix="/api/whatsapp", tags=["whatsapp"])
+app.include_router(payment_router, tags=["Payment"])
 
 app.include_router(chat.router)
 app.include_router(conversations.router)

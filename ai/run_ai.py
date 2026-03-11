@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai.prompts import system_prompt
 from ai.tools import get_weather, get_exchange_rate, get_products, tools, get_rate, search_similar_products, \
-    search_by_image
+    search_by_image, get_total
 from models import Message, Business
 from payment.payment import initialize_payment, verify_payment
 
@@ -74,6 +74,7 @@ available_functions = {
     "get_rate": get_rate,
     "initialize_payment": initialize_payment,
     "verify_payment": verify_payment,
+    "get_total": get_total,
     "search_similar_products": search_similar_products,
     "search_by_image": search_by_image,
 
@@ -95,9 +96,12 @@ async def call_function(function_name, db, business_id=None, **kwargs):
     if function_name == "search_similar_products" and business_id:
         kwargs['db'] = db
         kwargs['business_id'] = business_id
-    if function_name == "initialize_payment" and 'callback_url' not in kwargs:
-        # Inject the default callback URL if not provided by the AI
+    if function_name == "initialize_payment" and not kwargs.get('callback_url'):
+        kwargs['db'] = db
+        kwargs['business_id'] = business_id
         kwargs['callback_url'] = f"{os.getenv('AI_BASE_URL')}/paystack/callback"
+    if function_name == "verify_payment" and 'callback_url' not in kwargs:
+        kwargs['db'] = db
     if function_name == "search_by_image" and business_id:
         kwargs['db'] = db
         kwargs['business_id'] = business_id
@@ -105,6 +109,13 @@ async def call_function(function_name, db, business_id=None, **kwargs):
         if get_image_context():
             kwargs['image_data'] = get_image_context()
             kwargs.pop('image_url', None)  # remove hallucinated URL
+    if function_name == "get_total" and business_id:
+        kwargs['db'] = db
+        kwargs['business_id'] = business_id
+
+    if function_name not in available_functions:
+        logger.error(f"Tool '{function_name}' called by ai but not found in available_functions.")
+        return "Error: Tool not found."
 
     func = available_functions[function_name]
 
@@ -144,18 +155,14 @@ async def get_ai_response(user_input, db, conversation_history=None, business_id
     business_obj = business_result.scalar_one_or_none()
     business_prompt = business_obj.persona if business_obj else None
     if business_prompt:
-        messages.append({"role": "system", "content": business_prompt})
-
+        messages = [
+            {"role": "system", "content": system_prompt + business_prompt}
+        ]
     # ✅ Add user name context if available
     if user_name:
         messages.append({"role": "system", "content": f"The user's name is {user_name}."})
 
-    conversation_history = await get_conversation_history(
-        business_id=business_id,
-        customer_id=None,
-        customer_name=user_name,
-        db=db
-    )
+    # Use the passed conversation_history instead of fetching it again
     if conversation_history:
         for msg in conversation_history:
             role = "assistant" if msg["is_bot"] else "user"
@@ -194,16 +201,14 @@ async def get_ai_response(user_input, db, conversation_history=None, business_id
     # Log messages safely (truncate base64 images)
     messages_log = []
     for msg in messages:
-        if isinstance(msg.get("content"), list):
-            # Create a copy to avoid modifying the actual payload
-            msg_copy = msg.copy()
-            msg_copy["content"] = [
-                {"type": "image_url", "url": "TRUNCATED_BASE64"} if item.get("type") == "image_url" else item
-                for item in msg["content"]
+        content = msg.get("content")
+        if isinstance(content, list):
+            msg = msg.copy()
+            msg["content"] = [
+                (item | {"image_url": "TRUNCATED"}) if item.get("type") == "image_url" else item
+                for item in content
             ]
-            messages_log.append(msg_copy)
-        else:
-            messages_log.append(msg)
+        messages_log.append(msg)
     logger.info(f"Sending messages to AI: {messages_log}")
 
     try:
@@ -212,39 +217,65 @@ async def get_ai_response(user_input, db, conversation_history=None, business_id
             logger.error("AI client is not initialized. Make sure to run startup_ai_client() on app startup.")
             return "Sorry, the AI service is not configured correctly."
 
-        completion = await client.chat.completions.create(
-            model=ai_model,
-            messages=messages,
-            tools=tools,
-        )
-        completion.model_dump()
-        response_message = completion.choices[0].message
-        logger.info(f"AI First Response: {response_message}")
+        # 2. Main loop to handle multiple (recursive) tool calls
+        max_tool_iterations = 5
+        for iteration in range(max_tool_iterations):
+            completion = await client.chat.completions.create(
+                model=ai_model,
+                messages=messages,
+                tools=tools,
+            )
+            
+            response_message = completion.choices[0].message
+            logger.info(f"AI Response (iter {iteration+1}): {response_message}")
 
-        # 3. If no tool calls → return direct response
-        if response_message.tool_calls:
+            if not response_message.tool_calls:
+                # No more tools needed, return direct response
+                final_response = response_message.content or "I have processed your request."
+                if not final_response.strip():
+                    final_response = "I have processed your request."
+                logger.info(f"AI Final Response: {final_response}")
+                return final_response
+
             logger.info("🔧 Tool calls detected!")
-            messages.append(response_message)
+            
+            # Convert response_message to dict to avoid OpenRouter 500 errors
+            assistant_msg = {
+                "role": "assistant",
+                "content": response_message.content,
+                "tool_calls": [tool_call.model_dump() for tool_call in response_message.tool_calls]
+            }
+            messages.append(assistant_msg)
 
-            # 4. Execute all tool calls in parallel
+            # Execute all tool calls in parallel
             # We use a lock for tools that require the shared DB session to avoid race conditions
             db_lock = asyncio.Lock()
-            db_tools = {"get_products", "search_similar_products", "search_by_image"}
+            db_tools = {"get_products", "search_similar_products", "search_by_image", "verify_payment", "initialize_payment"}
 
             async def execute_tool(tool_call):
                 function_name = tool_call.function.name
-                function_args = json.loads(tool_call.function.arguments)
+                
+                try:
+                    function_args = json.loads(tool_call.function.arguments)
+                except Exception as e:
+                    logger.error(f"Failed to parse function arguments: {e}")
+                    function_args = {}
+                    
                 logger.info(f"Calling tool: {function_name} with {function_args}")
 
-                # Execute the tool (business_id injected in call_function)
-                # Acquire lock only if the tool uses the DB session
-                if function_name in db_tools:
-                    async with db_lock:
+                try:
+                    # Execute the tool (business_id injected in call_function)
+                    # Acquire lock only if the tool uses the DB session
+                    if function_name in db_tools:
+                        async with db_lock:
+                            function_result = await call_function(function_name, db=db, business_id=business_id,
+                                                                  **function_args)
+                    else:
                         function_result = await call_function(function_name, db=db, business_id=business_id,
                                                               **function_args)
-                else:
-                    function_result = await call_function(function_name, db=db, business_id=business_id,
-                                                          **function_args)
+                except Exception as e:
+                    logger.error(f"Error executing tool {function_name}: {e}")
+                    function_result = {"error": str(e)}
 
                 # Log result safely (truncate if too long)
                 result_str = str(function_result)
@@ -261,18 +292,8 @@ async def get_ai_response(user_input, db, conversation_history=None, business_id
             tool_outputs = await asyncio.gather(*(execute_tool(tc) for tc in response_message.tool_calls))
             messages.extend(tool_outputs)
 
-            # 5. Second API call with all function results
-            second_completion = await client.chat.completions.create(
-                model=ai_model,
-                messages=messages,
-                tools=tools,
-            )
-            final_response = second_completion.choices[0].message.content or ""
-            logger.info(f"AI Final Response: {final_response}")
-            return final_response
-        else:
-            # No tools needed, return direct response
-            return response_message.content or ""
+        logger.warning(f"Max tool iterations ({max_tool_iterations}) reached.")
+        return "I am taking too long to process this request. Let me know if you need anything else."
 
     except Exception as e:
         logger.error(f"AI Response Error: {e}", exc_info=True)
@@ -323,16 +344,23 @@ async def update_conversation_history(db, business_id, text, sender, customer_id
     return new_msg
 
 
-async def clear_conversation_history(db, business_id, sender):
-    """Delete all messages associated with a specific business."""
-    from sqlalchemy import and_
+async def clear_conversation_history(db, business_id, customer_id=None, customer_name=None):
+    """Delete all messages associated with a specific business and customer."""
+    from sqlalchemy import and_, or_
+
+    filters = [Message.business_id == business_id]
+
+    if customer_id and customer_name:
+        filters.append(or_(Message.customer_id == str(customer_id), Message.customer_name == customer_name))
+    elif customer_id:
+        filters.append(Message.customer_id == str(customer_id))
+    elif customer_name:
+        filters.append(Message.customer_name == customer_name)
+    else:
+        return
+
     results = await db.execute(
-        delete(Message).where(
-            and_(
-                Message.business_id == business_id,
-                Message.sender == sender
-            )
-        )
+        delete(Message).where(and_(*filters))
     )
-    logger.info(f"{results.rowcount} messages were deleted by {sender}")
+    logger.info(f"{results.rowcount} messages were deleted for {customer_id or customer_name}")
     await db.commit()

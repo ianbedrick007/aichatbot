@@ -1,3 +1,4 @@
+import logging
 import os
 
 import requests
@@ -10,8 +11,9 @@ from models import Product
 
 load_dotenv()
 
-BASE_URL = os.getenv("VAULTA_BASE_URL")
-VAULTA_BASE_URL = BASE_URL
+logger = logging.getLogger(__name__)
+
+VAULTA_BASE_URL = os.getenv("VAULTA_BASE_URL")
 VAULTA_API_KEY = os.getenv("VAULTA_API_KEY")
 tools = [
     {
@@ -20,7 +22,6 @@ tools = [
             "name": "get_weather",
             "description": "Get the current temperature for a specific geographic location using latitude and longitude"
             ,
-            "strict": True,
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -33,8 +34,7 @@ tools = [
                         "description": "Longitude of the location"
                     }
                 },
-                "required": ["latitude", "longitude"],
-                "additionalProperties": False,
+                "required": ["latitude", "longitude"]
             }
         }
     },
@@ -43,7 +43,6 @@ tools = [
         "function": {
             "name": "get_exchange_rate",
             "description": "Get the exchange rate and metadata for a specific currency pair",
-            "strict": True,
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -56,8 +55,7 @@ tools = [
                         "description": "The target currency code (e.g., 'EUR')"
                     }
                 },
-                "required": ["local_currency", "foreign_currency"],
-                "additionalProperties": False,
+                "required": ["local_currency", "foreign_currency"]
             }
         }
     },
@@ -66,12 +64,10 @@ tools = [
         "function": {
             "name": "get_products",
             "description": "Get the list of products for the current user's business",
-            "strict": True,
             "parameters": {
                 "type": "object",
                 "properties": {},
-                "required": [],
-                "additionalProperties": False,
+                "required": []
             }
         }
     },
@@ -80,7 +76,6 @@ tools = [
         "function": {
             "name": "get_rate",
             "description": "Create a quote for a crypto-fiat pair using the VAULTA API",
-            "strict": True,
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -101,52 +96,58 @@ tools = [
                         "description": "Amount of quote currency"
                     }
                 },
-                "required": ["pair", "side", "amount_crypto", "amount_fiat"],
-                "additionalProperties": False,
+                "required": ["pair", "side", "amount_crypto", "amount_fiat"]
             }
         }
     },
     {
-        "name": "initialize_payment",
-        "description": "Initialize a Paystack payment transaction. Amount should be provided in major currency units (e.g., GHS). Returns authorization URL and transaction reference.",
-        "strict": True,
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "customer_email": {
-                    "type": "string",
-                    "description": "The customer's actual email address. Ask them for it if not known."
+        "type": "function",
+        "function": {
+            "name": "initialize_payment",
+            "description": "Initialize a Paystack payment transaction and automatically create a pending order. Returns the checkout URL and the generated transaction reference.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "customer_name": {
+                        "type": "string",
+                        "description": "The name of the customer placing the order. Ask for it if not known."
+                    },
+                    "customer_email": {
+                        "type": "string",
+                        "description": "The customer's actual email address. Ask them for it if not known."
+                    },
+                    "amount": {
+                        "type": "number",
+                        "description": "Amount in major units (e.g., 10.50 for GHS 10.50)"
+                    },
+                    "callback_url": {
+                        "type": "string",
+                        "description": "Optional callback URL for Paystack redirect"
+                    },
+                    "currency": {
+                        "type": "string",
+                        "description": "Currency code (default: GHS)"
+                    }
                 },
-                "amount": {
-                    "type": "number",
-                    "description": "Amount in major units (e.g., 10.50 for GHS 10.50)"
-                },
-                "callback_url": {
-                    "type": "string",
-                    "description": "Optional callback URL for Paystack redirect",
-                    "nullable": True
-                },
-                "currency": {
-                    "type": "string",
-                    "description": "Currency code (default: GHS)",
-                    "default": "GHS"
-                }
-            },
-            "required": ["customer_email", "amount"]
+                "required": ["customer_name", "customer_email", "amount", "currency"]
+            }
         }
     },
     {
-        "name": "verify_payment",
-        "description": "Verify a Paystack transaction using its reference. Returns transaction status, metadata, and payment details.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "reference": {
-                    "type": "string",
-                    "description": "The Paystack transaction reference to verify"
-                }
-            },
-            "required": ["reference"]
+        "type": "function",
+        "function": {
+            "name": "verify_payment",
+            "description": "Verify a Paystack transaction using its reference. If successful, it automatically updates the order status to paid.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "reference": {
+                        "type": "string",
+                        "description": "The Paystack transaction reference to verify (e.g., 'ORD-XXXXXX') returned by initialize_payment."
+                    }
+                },
+                "required": ["reference"]
+            }
         }
     },
     {
@@ -154,7 +155,6 @@ tools = [
         "function": {
             "name": "search_similar_products",
             "description": "Search for products that are visually or semantically similar to a text description. Use when a customer describes what they're looking for or wants to find products similar to something.",
-            "strict": True,
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -167,8 +167,7 @@ tools = [
                         "description": "Maximum number of results to return (default 5)"
                     }
                 },
-                "required": ["query", "limit"],
-                "additionalProperties": False
+                "required": ["query", "limit"]
             }
         }
     },
@@ -177,7 +176,6 @@ tools = [
         "function": {
             "name": "search_by_image",
             "description": "Search for products similar to an image by generating an image embedding from a provided image URL. Use when a customer uploads or shares an image and wants to find visually similar products.",
-            "strict": True,
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -190,8 +188,7 @@ tools = [
                         "description": "Maximum number of results to return (default 5)"
                     }
                 },
-                "required": ["image_url", "limit"],
-                "additionalProperties": False
+                "required": ["image_url", "limit"]
             }
         }
     }, {
@@ -205,12 +202,13 @@ tools = [
                     "product_name": {
                         "type": "string",
                         "description": "Name of the product the user wants, e.g. 'waakye'"
-                    }
-                    , "quantity": {
+                    },
+                    "quantity": {
                         "type": "integer",
                         "description": "Number of units the user wants to order, e.g. 2"
                     }
-                }
+                },
+                "required": ["product_name", "quantity"]
             }
         }
     }
@@ -298,7 +296,6 @@ def get_rate(pair, side, amount_crypto, amount_fiat):
 
     try:
         response = requests.post(quotes_url, headers=headers, json=payload)
-        l
         response.raise_for_status()
         quote = response.json()
         print("Quote created successfully:")
@@ -320,6 +317,7 @@ async def search_similar_products(query: str, limit: int = 5, db: AsyncSession =
         try:
             query_embedding = generate_text_embedding(query)
         except Exception as e:
+            logger.warning(f"Vector search warning (embedding failed): {e}")
             return {"error": f"Failed to generate text embedding: {str(e)}"}
 
         # Query using pgvector cosine distance
@@ -349,6 +347,7 @@ async def search_similar_products(query: str, limit: int = 5, db: AsyncSession =
             for p in products
         ]
     except Exception as e:
+        logger.warning(f"Vector search warning (search_similar_products): {e}")
         return {"error": str(e)}
 
 
@@ -402,4 +401,53 @@ async def search_by_image(image_url: str = None, image_data: str = None,
             for p in results
         ]
     except Exception as e:
+        return {"error": str(e)}
+
+
+async def get_total(product_name: str, quantity: int, db: AsyncSession, business_id: int):
+    """
+    Calculate the total price for a specific product and quantity.
+    """
+    try:
+        if not db or not business_id:
+            return {"error": "Database session and business ID required"}
+
+        # Search for the product by name (case-insensitive)
+        result = await db.execute(
+            select(Product).where(
+                Product.business_id == business_id,
+                Product.name.ilike(f"%{product_name}%")
+            )
+        )
+        product = result.scalars().first()
+
+        # Fallback: If strict text match fails, try vector similarity
+        if not product:
+            try:
+                # Generate embedding for the product name to find semantic match
+                query_embedding = generate_text_embedding(product_name)
+                result = await db.execute(
+                    select(Product)
+                    .where(
+                        Product.business_id == business_id,
+                        Product.image_embedding.isnot(None)
+                    )
+                    .order_by(Product.image_embedding.cosine_distance(query_embedding))
+                    .limit(1)
+                )
+                product = result.scalars().first()
+            except Exception as e:
+                logger.warning(f"Vector fallback in get_total failed: {e}")
+
+        if not product:
+            return {"error": f"Product '{product_name}' not found."}
+
+        total_amount = product.price * quantity
+
+        return {
+            "total_amount": total_amount,
+            "currency": "GHS"  # Default currency
+        }
+    except Exception as e:
+        logger.error(f"Error in get_total: {e}")
         return {"error": str(e)}

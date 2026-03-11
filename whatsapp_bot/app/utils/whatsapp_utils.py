@@ -76,6 +76,9 @@ async def send_message(data: dict, phone_number_id: str = None, access_token: st
 
 
 def process_text_for_whatsapp(text: str):
+    if not text:
+        return ""
+    
     # Remove 【...】
     text = re.sub(r"\【.*?\】", "", text).strip()
 
@@ -219,7 +222,7 @@ async def process_whatsapp_message(body, db: AsyncSession):
 
     # ✅ Get AI response with business context
     if message_body.lower() == "refresh":
-        await clear_conversation_history(db, business_id=business.id, sender=name)
+        await clear_conversation_history(db, business_id=business.id, customer_id=wa_id)
         response = "History refreshed. How can I help you today?"
     else:
         response = await get_ai_response(message_body, db, conversation_history, business_id=business.id, user_name=name,
@@ -227,6 +230,11 @@ async def process_whatsapp_message(body, db: AsyncSession):
 
     # Process for WhatsApp formatting
     response = process_text_for_whatsapp(response)
+
+    # Fallback to prevent 400 Bad Request on empty message body
+    if not response or not response.strip():
+        logging.warning("Empty AI response generated. Using fallback message.")
+        response = "I've processed your request."
 
     # Send response back to user
     data = get_text_message_input(wa_id, response)
