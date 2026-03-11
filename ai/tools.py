@@ -3,10 +3,12 @@ import os
 
 import requests
 from dotenv import load_dotenv
+from fastapi import Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai.image_embeddings import generate_text_embedding, generate_image_embedding, generate_image_embedding_from_base64
+from database import get_db
 from models import Product
 
 load_dotenv()
@@ -254,7 +256,7 @@ def get_exchange_rate(local_currency, foreign_currency):
         return {"error": str(e)}
 
 
-async def get_products(db: AsyncSession, business_id: int):
+async def get_products(db: AsyncSession= Depends(get_db), business_id: int = None):
     """
     Get the list of products for a business.
     """
