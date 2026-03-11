@@ -20,10 +20,10 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from ai.run_ai import get_ai_response, update_conversation_history, get_conversation_history, startup_ai_client
 from auth import create_access_token
 from database import get_db, engine, get_current_user, get_current_business
-from models import Business, User, Base, Product, Message, Mailinglist
+from models import Business, User, Base, Product, Message, Mailinglist, Order
+from payment.payment import router as payment_router
 from routers import products, users, conversations, chat
 from whatsapp_bot.app import router as whatsapp_router, configure_logging
-from payment.payment import router as payment_router
 
 
 # Define the application lifespan
@@ -255,20 +255,24 @@ async def dashboard_page(
         TemplateResponse: The rendered dashboard with business statistics.
     """
     business = await get_current_business(db, current_user)
-    result = await db.execute(
+    products_result = await db.execute(
         select(func.count())
         .select_from(Product)
         .where(Product.business_id == business.id)
     )
 
-    products_count = result.scalar_one()
+    products_count = products_result.scalar_one()
 
+    order_result = await db.execute(select(func.count())
+        .select_from(Order)
+        .where(Order.business_id == business.id))
+    order_count = order_result.scalar_one()
     # TODO 1: add orders, payments, payouts, invoices and ai credits to Business model.
     return templates.TemplateResponse(
         "dashboard.html",
         {
             "request": request, "business": business, "products_count": products_count,
-            "orders": [], "payments": [], "payouts": [], "invoices": [], "ai_credits": None,
+            "orders_count": order_count, "payments": [], "payouts": [], "invoices": [], "ai_credits": 10000,
         }
     )
 

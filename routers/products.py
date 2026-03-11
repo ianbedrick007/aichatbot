@@ -25,8 +25,8 @@ ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"}
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
 
 
-def save_upload_file(upload_file: UploadFile) -> str:
-    """Save an uploaded file and return the relative URL path."""
+def save_upload_file(upload_file: UploadFile) -> tuple[str, str]:
+    """Save an uploaded file and return the filename and absolute file path."""
     # Validate extension
     ext = os.path.splitext(upload_file.filename or "")[1].lower()
     if ext not in ALLOWED_EXTENSIONS:
@@ -62,7 +62,7 @@ def save_upload_file(upload_file: UploadFile) -> str:
     with open(filepath, "wb") as f:
         f.write(contents)
 
-    return filename + filepath
+    return filename, filepath
 
 
 @router.get("/api/v1/products/{business_id}", response_model=list[ProductResponse], tags=["Products"])
@@ -231,5 +231,3 @@ async def delete_product(product_id: int, db: AsyncSession = Depends(get_db)):
 
     await db.delete(product)
     await db.commit()
-
-

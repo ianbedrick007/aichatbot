@@ -76,10 +76,9 @@
 }
 
 .chat-v2-msg.bot .chat-v2-bubble {
-    background: var(--teal-soft);
-    border: 1px solid var(--teal-primary);
-    color: var(--teal-primary);
-    box-shadow: var(--shadow-teal);
+    background: rgba(0, 242, 255, 0.1);
+    border: 1px solid rgba(0, 242, 255, 0.3);
+    color: var(--text-primary);
 }
 
 .chat-v2-meta {

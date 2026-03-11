@@ -124,7 +124,7 @@ load_dotenv()
 
 # Vertex AI config from environment
 GCP_PROJECT = settings.gcp_project_id
-GCP_LOCATION = settings.gcp_location
+GCP_LOCATION = "us-central1"
 EMBEDDING_DIM = 1408
 MODEL_ID = "gemini-embedding-2-preview"
 

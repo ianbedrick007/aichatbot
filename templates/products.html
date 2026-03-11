@@ -24,6 +24,33 @@
         border: 1px dashed var(--border-subtle);
         border-radius: var(--radius-sm);
     }
+
+    .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+    }
+
+    .modal-content {
+        background-color: var(--bg-surface);
+        padding: 2rem;
+        border-radius: var(--radius-md);
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        width: 90%;
+        max-width: 500px;
+        position: relative;
+    }
+
+    .hidden {
+        display: none !important;
+    }
 </style>
 {% endblock %}
 
@@ -71,8 +98,12 @@
                     <td>
                         <div class="flex justify-end gap-2">
                             <button class="action-icon" style="width: 32px; height: 32px;" title="Edit Product"
-                                onclick="openEditModal(this)" data-id="{{ product.id }}" data-name="{{ product.name }}"
-                                data-price="{{ product.price }}" data-desc="{{ product.description or '' }}">
+                                onclick='openEditModal(this)'
+                                data-id="{{ product.id }}"
+                                data-name="{{ product.name }}"
+                                data-price="{{ product.price }}"
+                                data-desc="{{ product.description or '' }}"
+                                data-image="{{ product.image_url or '' }}">
                                 <i data-lucide="edit-3" style="width: 16px;"></i>
                             </button>
                             <button
@@ -144,6 +175,12 @@
                     PRODUCT IMAGE
                     <span class="text-xs text-teal">OPTIONAL</span>
                 </label>
+
+                <div id="preview-container" class="hidden mb-3 flex flex-col items-center p-2 rounded" style="background: var(--bg-surface); border: 1px dashed var(--border-subtle);">
+                    <img id="img-preview" src="" alt="Preview" class="rounded mb-2" style="max-height: 150px; object-fit: contain;">
+                    <button type="button" id="remove-image-btn" class="text-xs text-error hover:text-red-500 hidden" onclick="clearImagePreview()">Remove Image</button>
+                </div>
+
                 <input type="file" id="product-img" name="image" class="form-control" accept="image/*"
                     style="padding: 9px 12px;">
                 <p class="text-xs text-tertiary mt-1">Required for visual AI features. Max size 5MB.</p>
@@ -171,14 +208,23 @@
     const priceInput = document.getElementById('product-price');
     const descInput = document.getElementById('product-desc');
     const editIdInput = document.getElementById('edit-product-id');
+    const imgInput = document.getElementById('product-img');
+    const previewContainer = document.getElementById('preview-container');
+    const imgPreview = document.getElementById('img-preview');
+    const removeImageBtn = document.getElementById('remove-image-btn');
 
     function openModal() {
         modalTitle.innerText = "ADD NEW PRODUCT";
         submitBtn.innerHTML = '<i data-lucide="save" style="width: 16px;"></i> SAVE PRODUCT';
+        // Reset form handling for creation
+        form.onsubmit = null;
         form.action = "/api/v1/products";
         form.method = "POST";
+
         editIdInput.value = "";
         form.reset();
+        clearImagePreview();
+
         modal.classList.remove('hidden');
         lucide.createIcons();
     }
@@ -188,51 +234,112 @@
         const name = btn.dataset.name;
         const price = btn.dataset.price;
         const desc = btn.dataset.desc;
+        const imageUrl = btn.dataset.image;
 
         modalTitle.innerText = "EDIT PRODUCT";
         submitBtn.innerHTML = '<i data-lucide="refresh-cw" style="width: 16px;"></i> UPDATE PRODUCT';
-        form.action = `/api/v1/products/${id}`;
+
+        // Setup form for editing
+        form.action = `/api/v1/products/${id}`; // This won't actually be used because we hijack submit
 
         nameInput.value = name;
         priceInput.value = price;
         descInput.value = desc;
         editIdInput.value = id;
+        imgInput.value = ""; // Clear file input
+        
+        if (imageUrl) {
+            imgPreview.src = imageUrl;
+            previewContainer.classList.remove('hidden');
+            removeImageBtn.classList.remove('hidden');
+        } else {
+            clearImagePreview();
+        }
+
+        // Custom submit handler for editing (using PATCH)
+        form.onsubmit = async (e) => {
+            e.preventDefault();
+            await updateProduct(id);
+        };
 
         modal.classList.remove('hidden');
         lucide.createIcons();
     }
 
+    function clearImagePreview() {
+        imgPreview.src = "";
+        previewContainer.classList.add('hidden');
+        removeImageBtn.classList.add('hidden');
+        imgInput.value = "";
+    }
+
+    imgInput.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                imgPreview.src = e.target.result;
+                previewContainer.classList.remove('hidden');
+                removeImageBtn.classList.remove('hidden');
+            }
+            reader.readAsDataURL(file);
+        }
+    });
+
     function closeModal() {
         modal.classList.add('hidden');
     }
 
-    form.addEventListener('submit', async (e) => {
-        if (modalTitle.innerText === "EDIT PRODUCT") {
-            e.preventDefault();
-            const id = editIdInput.value;
+    async function updateProduct(id) {
+        const formData = new FormData();
+        // Append fields only if they have values to avoid overwriting with empty
+        if (nameInput.value) formData.append('name', nameInput.value);
+        if (priceInput.value) formData.append('price', priceInput.value);
+        formData.append('description', descInput.value); // Description can be empty
 
-            try {
-                const resp = await fetch(`/api/v1/products/${id}`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        name: nameInput.value,
-                        price: parseFloat(priceInput.value),
-                        description: descInput.value
-                    })
+        // 1. First update product details
+        try {
+            // PATCH request for details
+            const resp = await fetch(`/api/v1/products/${id}`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    name: nameInput.value,
+                    price: parseFloat(priceInput.value),
+                    description: descInput.value
+                })
+            });
+
+            if (!resp.ok) {
+                const err = await resp.json();
+                throw new Error(err.detail || 'Failed to update product details');
+            }
+
+            // 2. If image is selected, upload it separately
+            if (imgInput.files[0]) {
+                const imageFormData = new FormData();
+                imageFormData.append('image', imgInput.files[0]);
+
+                const imgResp = await fetch(`/api/v1/products/${id}/image`, {
+                    method: 'POST',
+                    body: imageFormData
                 });
 
-                if (resp.ok) {
-                    window.location.reload();
-                } else {
-                    const err = await resp.json();
-                    alert(`UPDATE FAILED: ${err.detail || 'UNKNOWN ERROR'}`);
+                if (!imgResp.ok) {
+                    const err = await imgResp.json();
+                    throw new Error(err.detail || 'Failed to update product image');
                 }
-            } catch (err) {
-                console.error('Update failed:', err);
             }
+
+            window.location.reload();
+
+        } catch (err) {
+            console.error('Update failed:', err);
+            alert(`UPDATE FAILED: ${err.message}`);
         }
-    });
+    }
 
     async function deleteProduct(btn) {
         const id = btn.dataset.id;

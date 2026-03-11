@@ -106,7 +106,7 @@ class ProductResponse(ProductBase):
     id: int
     business_id: int
     created_at: datetime
-    has_embedding: bool = False
+    image_url: str | None = None
 
 
 # Message Schemas
@@ -134,4 +134,4 @@ class ToggleAIRequest(BaseModel):
 
 
 class ChatRequest(BaseModel):
-    message: str
+    message: str | None = None
